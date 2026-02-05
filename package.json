@@ -1,0 +1,50 @@
+{
+  "name": "decision-guardian",
+  "version": "1.0.0",
+  "description": "Surface architectural decision context on Pull Requests",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "bundle": "ncc build src/main.ts -o dist --source-map --license licenses.txt",
+    "test": "jest",
+    "test:e2e": "npx ts-node scripts/e2e-test.ts",
+    "lint": "eslint src/**/*.ts",
+    "format": "prettier --write src/**/*.ts",
+    "all": "npm run format && npm run lint && npm run test && npm run build && npm run bundle"
+  },
+  "keywords": [
+    "actions",
+    "github",
+    "documentation",
+    "architecture",
+    "decisions"
+  ],
+  "author": "Decispher",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/decispher/decision-guardian.git"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@actions/core": "^1.10.1",
+    "@actions/github": "^6.0.0",
+    "minimatch": "^9.0.3",
+    "parse-diff": "^0.11.1",
+    "safe-regex": "^2.1.1",
+    "zod": "^4.3.5"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.11",
+    "@types/node": "^20.0.0",
+    "@types/safe-regex": "^1.1.6",
+    "@typescript-eslint/eslint-plugin": "^6.18.0",
+    "@typescript-eslint/parser": "^6.18.0",
+    "@vercel/ncc": "^0.38.1",
+    "dotenv": "^17.2.3",
+    "eslint": "^8.56.0",
+    "jest": "^29.7.0",
+    "prettier": "^3.1.1",
+    "ts-jest": "^29.1.1",
+    "typescript": "^5.3.3"
+  }
+}

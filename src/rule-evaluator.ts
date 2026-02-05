@@ -1,0 +1,224 @@
+/**
+ * Rule Evaluator - Evaluates decision rules against file diffs
+ * Supports AND/OR logic, nesting with depth limits, and parallel processing
+ */
+import * as core from '@actions/core';
+import { minimatch } from 'minimatch';
+import { RuleCondition, FileRule, ContentRule, MAX_RULE_DEPTH, isFileRule } from './rule-types';
+import { FileDiff, RuleMatchDetails } from './types';
+import { ContentMatchers } from './content-matchers';
+
+export class RuleEvaluator {
+  private contentMatchers = new ContentMatchers();
+
+  /**
+   * Evaluate if a PR's changes match the decision rules
+   */
+  async evaluate(
+    rules: RuleCondition,
+    fileDiffs: FileDiff[],
+    depth: number = 0,
+  ): Promise<RuleMatchDetails> {
+    // Depth safety check
+    if (depth > MAX_RULE_DEPTH) {
+      return {
+        matched: false,
+        matchedPatterns: [],
+        matchedFiles: [],
+        ruleDepth: depth,
+        error: `Rule nesting exceeds max depth of ${MAX_RULE_DEPTH}`,
+      };
+    }
+
+    const matchMode = rules.match_mode || 'any';
+
+    // Check if this is a simple single-rule case (has pattern but no conditions)
+    if (rules.pattern && !rules.conditions) {
+      return this.evaluateSingleRule(rules as unknown as FileRule, fileDiffs, depth);
+    }
+
+    // No conditions means no match
+    if (!rules.conditions || rules.conditions.length === 0) {
+      return {
+        matched: false,
+        matchedPatterns: [],
+        matchedFiles: [],
+        ruleDepth: depth,
+      };
+    }
+
+    // Evaluate all conditions in parallel
+    const settlement = await Promise.allSettled(
+      rules.conditions.map((condition) => {
+        if (isFileRule(condition)) {
+          return this.evaluateSingleRule(condition, fileDiffs, depth + 1);
+        } else {
+          return this.evaluate(condition as RuleCondition, fileDiffs, depth + 1);
+        }
+      }),
+    );
+
+    const results = settlement.map((r) =>
+      r.status === 'fulfilled'
+        ? r.value
+        : {
+            matched: false,
+            matchedPatterns: [],
+            matchedFiles: [],
+            ruleDepth: depth + 1,
+            error: `Condition evaluation failed: ${r.reason}`,
+          },
+    );
+
+    // Apply boolean logic
+    const matched =
+      matchMode === 'all'
+        ? results.every((r) => r.matched) // AND
+        : results.some((r) => r.matched); // OR
+
+    // Collect all matched patterns and files
+    const matchedPatterns = results.flatMap((r) => r.matchedPatterns).sort();
+    const matchedFiles = [...new Set(results.flatMap((r) => r.matchedFiles))].sort();
+    const errors = results
+      .map((r) => r.error)
+      .filter(Boolean)
+      .join('; ');
+
+    return {
+      matched,
+      matchedPatterns,
+      matchedFiles,
+      ruleDepth: depth,
+      error: errors || undefined,
+    };
+  }
+
+  /**
+   * Evaluate a single file rule with error boundary
+   */
+  private async evaluateSingleRule(
+    rule: FileRule,
+    fileDiffs: FileDiff[],
+    depth: number,
+  ): Promise<RuleMatchDetails> {
+    try {
+      // Find files matching the glob pattern
+      const matchingFiles = fileDiffs.filter((file) => {
+        const matches = minimatch(file.filename, rule.pattern, {
+          dot: true,
+          matchBase: false,
+          nocase: false,
+        });
+
+        // Apply exclusion pattern if present
+        if (matches && rule.exclude) {
+          return !minimatch(file.filename, rule.exclude, {
+            dot: true,
+            matchBase: false,
+            nocase: false,
+          });
+        }
+
+        return matches;
+      });
+
+      if (matchingFiles.length === 0) {
+        return {
+          matched: false,
+          matchedPatterns: [],
+          matchedFiles: [],
+          ruleDepth: depth,
+        };
+      }
+
+      // If no content rules, file match alone is enough
+      if (!rule.content_rules || rule.content_rules.length === 0) {
+        return {
+          matched: true,
+          matchedPatterns: [rule.pattern],
+          matchedFiles: matchingFiles.map((f) => f.filename),
+          ruleDepth: depth,
+        };
+      }
+
+      // Check content rules against diffs
+      const allMatchedPatterns: string[] = [];
+      const allMatchedFiles: string[] = [];
+
+      for (const file of matchingFiles) {
+        const contentResult = await this.evaluateContentRules(rule.content_rules, file);
+        if (contentResult.matched) {
+          allMatchedPatterns.push(...contentResult.matchedPatterns);
+          allMatchedFiles.push(file.filename);
+        }
+      }
+
+      return {
+        matched: allMatchedFiles.length > 0,
+        matchedPatterns: [...new Set(allMatchedPatterns)].sort(),
+        matchedFiles: allMatchedFiles.sort(),
+        ruleDepth: depth,
+      };
+    } catch (error) {
+      // Error boundary: log and skip this rule, don't kill entire evaluation
+      const message = error instanceof Error ? error.message : String(error);
+      core.warning(`Rule evaluation failed for pattern "${rule.pattern}": ${message}`);
+
+      return {
+        matched: false,
+        matchedPatterns: [],
+        matchedFiles: [],
+        ruleDepth: depth,
+        error: message,
+      };
+    }
+  }
+
+  /**
+   * Evaluate content rules against a file diff
+   * Returns true if ANY content rule matches (OR logic within content_rules)
+   */
+  private async evaluateContentRules(
+    rules: ContentRule[],
+    file: FileDiff,
+  ): Promise<{ matched: boolean; matchedPatterns: string[] }> {
+    const allMatchedPatterns: string[] = [];
+
+    for (const rule of rules) {
+      let result: { matched: boolean; matchedPatterns: string[] };
+
+      switch (rule.mode) {
+        case 'string':
+          result = this.contentMatchers.matchString(rule, file);
+          break;
+        case 'regex':
+          // Await the async regex matcher (protected by VM timeout)
+          result = await this.contentMatchers.matchRegex(rule, file);
+          break;
+        case 'line_range':
+          result = this.contentMatchers.matchLineRange(rule, file);
+          break;
+        case 'full_file':
+          result = this.contentMatchers.matchFullFile(file);
+          break;
+        case 'json_path':
+          result = this.contentMatchers.matchJsonPath(rule, file);
+          break;
+        default: {
+          // Exhaustiveness check: if a new mode is added, this will fail at compile time
+          const _exhaustiveCheck: never = rule.mode;
+          throw new Error(`Unhandled content match mode: ${_exhaustiveCheck}`);
+        }
+      }
+
+      if (result.matched) {
+        allMatchedPatterns.push(...result.matchedPatterns);
+      }
+    }
+
+    return {
+      matched: allMatchedPatterns.length > 0,
+      matchedPatterns: allMatchedPatterns.sort(),
+    };
+  }
+}
