@@ -31,7 +31,7 @@
     "minimatch": "^9.0.3",
     "parse-diff": "^0.11.1",
     "safe-regex": "^2.1.1",
-    "zod": "^4.3.5"
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/jest": "^29.5.11",
