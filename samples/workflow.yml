@@ -1,0 +1,36 @@
+# Sample workflow for Decision Guardian
+# Copy this file to YOUR repository at: .github/workflows/decision-guardian.yml
+
+name: Decision Guardian
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+# Required permissions for posting comments
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  check-decisions:
+    name: Check Architectural Decisions
+    runs-on: ubuntu-latest
+    
+    steps:
+      # Step 1: Checkout your repository
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      # Step 2: Run Decision Guardian
+      - name: Check decisions
+        uses: your-org/decision-guardian@v1
+        with:
+          # Path to your decisions file (optional, this is the default)
+          decision_file: '.decispher/decisions.md'
+          
+          # Set to 'true' to block PRs that violate critical decisions
+          fail_on_critical: 'false'
+          
+          # GitHub token for API access (required)
+          token: ${{ secrets.GITHUB_TOKEN }}

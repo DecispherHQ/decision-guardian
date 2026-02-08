@@ -1,0 +1,46 @@
+name: Test
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Lint
+        run: npm run lint
+      
+      - name: Test
+        run: npm test
+      
+      - name: Build
+        run: npm run build
+      
+      - name: Bundle
+        run: npm run bundle
+      
+      - name: Check dist/
+        run: |
+          if ! git diff --quiet --exit-code --ignore-space-at-eol -- dist/; then
+            git --no-pager diff -- dist/
+            echo "Error: dist/ is out of date. Run 'npm run bundle' and commit."
+            exit 1
+          fi
+
