@@ -5,6 +5,7 @@ import { DecisionMatch } from '../src/types';
 const createCommentMock = jest.fn().mockResolvedValue({});
 const updateCommentMock = jest.fn().mockResolvedValue({});
 const listCommentsMock = jest.fn().mockResolvedValue({ data: [] });
+const deleteCommentMock = jest.fn().mockResolvedValue({});
 
 jest.mock('@actions/github', () => ({
     getOctokit: jest.fn(() => ({
@@ -13,6 +14,7 @@ jest.mock('@actions/github', () => ({
                 createComment: createCommentMock,
                 updateComment: updateCommentMock,
                 listComments: listCommentsMock,
+                deleteComment: deleteCommentMock,
             },
         },
     })),
@@ -39,6 +41,7 @@ describe('CommentManager idempotency', () => {
         createCommentMock.mockClear();
         updateCommentMock.mockClear();
         listCommentsMock.mockClear();
+        deleteCommentMock.mockClear();
     });
 
     const mockMatch: DecisionMatch = {
@@ -218,6 +221,105 @@ describe('CommentManager idempotency', () => {
             const body = createCommentMock.mock.calls[0][0].body;
             expect(body).toContain('Critical Decisions (1)');
             expect(body).toContain('Informational (1)');
+        });
+    });
+
+    describe('postAllClear functionality', () => {
+        it('updates existing comment to all-clear status', async () => {
+            listCommentsMock.mockResolvedValue({
+                data: [
+                    {
+                        id: 456,
+                        body: '<!-- decision-guardian-v1 -->\n<!-- hash:somehash -->\n\n## ⚠️ Decision Context Alert\n\nOld warning content',
+                    },
+                ],
+            });
+
+            await manager.postAllClear();
+
+            expect(listCommentsMock).toHaveBeenCalledTimes(1);
+            expect(updateCommentMock).toHaveBeenCalledTimes(1);
+            expect(createCommentMock).not.toHaveBeenCalled();
+
+            const callArgs = updateCommentMock.mock.calls[0][0];
+            expect(callArgs.comment_id).toBe(456);
+            expect(callArgs.body).toContain('Decision Guardian - All Clear');
+            expect(callArgs.body).toContain('hash:all-clear');
+            expect(callArgs.body).toContain('no longer modifies any files protected');
+        });
+
+        it('does not create comment when no existing comment', async () => {
+            listCommentsMock.mockResolvedValue({ data: [] });
+
+            await manager.postAllClear();
+
+            expect(listCommentsMock).toHaveBeenCalledTimes(1);
+            expect(createCommentMock).not.toHaveBeenCalled();
+            expect(updateCommentMock).not.toHaveBeenCalled();
+        });
+
+        it('skips update when already showing all-clear', async () => {
+            listCommentsMock.mockResolvedValue({
+                data: [
+                    {
+                        id: 456,
+                        body: '<!-- decision-guardian-v1 -->\n<!-- hash:all-clear -->\n\n## ✅ Decision Guardian - All Clear',
+                    },
+                ],
+            });
+
+            await manager.postAllClear();
+
+            expect(listCommentsMock).toHaveBeenCalledTimes(1);
+            expect(updateCommentMock).not.toHaveBeenCalled();
+            expect(createCommentMock).not.toHaveBeenCalled();
+        });
+
+        it('transitions from all-clear back to warning when matches found again', async () => {
+            // First, simulate a comment that was set to all-clear
+            listCommentsMock.mockResolvedValue({
+                data: [
+                    {
+                        id: 456,
+                        body: '<!-- decision-guardian-v1 -->\n<!-- hash:all-clear -->\n\n## ✅ Decision Guardian - All Clear',
+                    },
+                ],
+            });
+
+            // Post new matches - should update the all-clear comment back to warning
+            await manager.postAlert([mockMatch]);
+
+            expect(updateCommentMock).toHaveBeenCalledTimes(1);
+            const callArgs = updateCommentMock.mock.calls[0][0];
+            expect(callArgs.comment_id).toBe(456);
+            expect(callArgs.body).toContain('Decision Context Alert');
+            expect(callArgs.body).toContain('Critical Decisions');
+            expect(callArgs.body).not.toContain('All Clear');
+        });
+
+        it('cleans up duplicate comments when posting all-clear', async () => {
+            listCommentsMock.mockResolvedValue({
+                data: [
+                    {
+                        id: 100,
+                        body: '<!-- decision-guardian-v1 -->\n<!-- hash:hash1 -->\n\nFirst comment',
+                    },
+                    {
+                        id: 200,
+                        body: '<!-- decision-guardian-v1 -->\n<!-- hash:hash2 -->\n\nDuplicate comment',
+                    },
+                ],
+            });
+
+            await manager.postAllClear();
+
+            // Should update the first comment
+            expect(updateCommentMock).toHaveBeenCalledTimes(1);
+            expect(updateCommentMock.mock.calls[0][0].comment_id).toBe(100);
+
+            // Should delete the duplicate
+            expect(deleteCommentMock).toHaveBeenCalledTimes(1);
+            expect(deleteCommentMock.mock.calls[0][0].comment_id).toBe(200);
         });
     });
 });

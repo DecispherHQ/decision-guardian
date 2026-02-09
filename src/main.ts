@@ -146,6 +146,11 @@ async function run(): Promise<void> {
       }
     } else {
       core.info('No decision matches found - PR is clear!');
+
+      // Update existing comment to "All Clear" status if one exists
+      const commentManager = new CommentManager(config.token);
+      await commentManager.postAllClear();
+
       core.setOutput('matches_found', 0);
       core.setOutput('critical_count', 0);
     }
