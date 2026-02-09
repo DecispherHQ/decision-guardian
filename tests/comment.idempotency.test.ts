@@ -321,5 +321,26 @@ describe('CommentManager idempotency', () => {
             expect(deleteCommentMock).toHaveBeenCalledTimes(1);
             expect(deleteCommentMock.mock.calls[0][0].comment_id).toBe(200);
         });
+
+        it('handles deleted comment (404) gracefully by skipping update', async () => {
+            listCommentsMock.mockResolvedValue({
+                data: [
+                    {
+                        id: 456,
+                        body: '<!-- decision-guardian-v1 -->\n<!-- hash:somehash -->\n\nOld warning',
+                    },
+                ],
+            });
+
+            // Simulate 404 on update
+            updateCommentMock.mockRejectedValue({ status: 404 });
+
+            await manager.postAllClear();
+
+            // Should attempt update but catch 404 and return
+            expect(listCommentsMock).toHaveBeenCalledTimes(1);
+            expect(updateCommentMock).toHaveBeenCalledTimes(1);
+            expect(createCommentMock).not.toHaveBeenCalled();
+        });
     });
 });

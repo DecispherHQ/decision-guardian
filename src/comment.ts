@@ -180,9 +180,17 @@ export class CommentManager {
     try {
       await this.octokit.rest.issues.updateComment({ owner, repo, comment_id: targetComment.id, body: allClearBody });
       core.info('Updated comment to all-clear status');
+      return;
     } catch (error: unknown) {
+      const errWithStatus = error as { status?: number };
+      if (errWithStatus.status === 404) {
+        core.warning(`Comment ${targetComment.id} was deleted, skipping all-clear update`);
+        return;
+      }
+
       const message = error instanceof Error ? error.message : String(error);
-      core.warning(`Failed to update comment to all-clear status: ${message}`);
+      core.error(`Failed to update comment to all-clear status: ${message}`);
+      throw error;
     }
   }
 
