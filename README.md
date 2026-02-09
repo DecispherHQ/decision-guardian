@@ -6,6 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Maintained by Decispher](https://img.shields.io/badge/Maintained%20by-Decispher-orange)](https://decispher.com)
 [![Website](https://img.shields.io/badge/Website-decision--guardian.decispher.com-blueviolet)](https://decision-guardian.decispher.com/)
+[![Security Policy](https://img.shields.io/badge/Security-Policy-brightgreen.svg)](SECURITY.md)
 
 Decision Guardian is a GitHub Action that automatically surfaces architectural decisions and critical context when Pull Requests modify protected files. Instead of relying on tribal knowledge, Decision Guardian proactively alerts teams when changes touch sensitive code.
 
@@ -29,6 +30,20 @@ Result: Team wastes 3 months re-evaluating the same decision
 ```
 
 **Decision Guardian prevents this by making past decisions visible when they matter most.**
+
+---
+
+## 🛡️ Trust & Safety
+
+> **"Is this safe to run on my private repo?"**
+
+We explicitly guarantee:
+
+- ❌ **No external network calls**: The action runs entirely within your GitHub Actions runner.
+- ❌ **No data leaves GitHub**: Your code, decisions, and logic never leave your repository.
+- ✅ **Read-only access**: We only require write permissions to post comments on Pull Requests.
+
+See [SECURITY.md](SECURITY.md) for our full security policy.
 
 ---
 
