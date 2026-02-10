@@ -12,6 +12,10 @@ Decision Guardian is a GitHub Action that automatically surfaces architectural d
 
 **Created by [Ali Abbas](https://github.com/gr8-alizaidi) • Part of the [Decispher](https://decispher.com) project**
 
+<div align="center">
+  <img src="documentation/demo.gif" alt="Decision Guardian Demo" width="100%">
+</div>
+
 ---
 
 ## 🎯 The Problem
