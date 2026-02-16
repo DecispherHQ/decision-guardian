@@ -1,16 +1,18 @@
 import * as dotenv from 'dotenv';
 import * as path from 'path';
-import { DecisionParser } from '../src/parser';
-import { FileMatcher } from '../src/matcher';
-import { getChangedFiles } from '../src/github-utils';
-
-import { CommentManager } from '../src/comment';
+import * as github from '@actions/github';
+import { DecisionParser } from '../src/core/parser';
+import { FileMatcher } from '../src/core/matcher';
+import { GitHubProvider } from '../src/adapters/github/github-provider';
+import { ConsoleLogger } from '../src/adapters/local/console-logger';
 
 // Load environment variables
 dotenv.config();
 
 async function runE2E() {
     console.log('🤖 Starting Decision Guardian E2E Test');
+
+    const logger = new ConsoleLogger();
 
     // 1. Validate Env Vars
     const token = process.env.GITHUB_TOKEN;
@@ -43,11 +45,19 @@ async function runE2E() {
         process.exit(1);
     }
 
+    // MOCK CONTEXT for GitHubProvider
+    Object.defineProperty(github.context, 'repo', {
+        get: () => ({ owner, repo }),
+        configurable: true
+    });
+    github.context.payload = {
+        pull_request: {
+            number: prNumber
+        }
+    } as any;
+
     try {
         // 2. Parse Decisions
-        // Resolve absolute path if needed, or assume relative to CWD
-        // For E2E, we might want to point to a specific file or the repo's file
-        // Here we assume running from project root
         console.log(`\n📂 Loading decisions from: ${decisionFile}`);
         const parser = new DecisionParser();
         const parseResult = await parser.parseFile(decisionFile);
@@ -55,21 +65,34 @@ async function runE2E() {
         if (parseResult.errors.length > 0) {
             console.error(`❌ Found ${parseResult.errors.length} parse errors:`);
             parseResult.errors.forEach(e => console.error(`   Line ${e.line}: ${e.message}`));
-            // We might want to continue depending on test goals, but let's stop for now on errors
             process.exit(1);
         }
         console.log(`✅ Loaded ${parseResult.decisions.length} decisions`);
 
         // 3. Fetch Changed Files
         console.log(`\n⬇️ Fetching changed files for PR #${prNumber} in ${owner}/${repo}...`);
-        const files = await getChangedFiles(token, { owner, repo, pull_number: prNumber });
+
+        const provider = new GitHubProvider(token, logger);
+        const files = await provider.getChangedFiles();
+
         console.log(`✅ Found ${files.length} changed files`);
         files.forEach(f => console.log(`   - ${f}`));
 
         // 4. Match
         console.log(`\n🔍 Matching against decisions...`);
-        const matcher = new FileMatcher(parseResult.decisions);
-        const matches = await matcher.findMatches(files);
+        const matcher = new FileMatcher(parseResult.decisions, logger);
+
+        // We need diffs for advanced matching, but if getting diffs is complex, we fallback to simple matching
+        // provider.getFileDiffs() gets diffs.
+        let matches;
+        try {
+            const fileDiffs = await provider.getFileDiffs();
+            matches = await matcher.findMatchesWithDiffs(fileDiffs);
+        } catch (e) {
+            console.warn('⚠️ Could not fetch file diffs, falling back to simple file matching');
+            matches = await matcher.findMatches(files);
+        }
+
         const grouped = matcher.groupBySeverity(matches);
 
         console.log(`\n📊 Results:`);
@@ -81,16 +104,13 @@ async function runE2E() {
         if (matches.length > 0) {
             console.log(`\n📋 Matches Details:`);
             matches.forEach(m => {
-                console.log(`   [${m.decision.severity.toUpperCase()}] ${m.file} (Matches: ${m.matchedPattern}) -> ${m.decision.title}`);
+                console.log(`   [${m.decision.severity.toUpperCase()}] ${m.file} -> ${m.decision.title}`);
             });
 
             // 5. Post Comment (if enabled)
             if (process.env.POST_COMMENT === 'true') {
                 console.log(`\n💬 Posting comment to PR #${prNumber}...`);
-                // CommentManager imported statically at top
-                console.log(`\n💬 Posting comment to PR #${prNumber}...`);
-                const commentManager = new CommentManager(token);
-                await commentManager.postAlert(matches, { owner, repo, number: prNumber });
+                await provider.postComment(matches);
                 console.log(`✅ Comment posted successfully`);
             } else {
                 console.log(`\nℹ️  Skipping comment posting (set POST_COMMENT=true to enable)`);
@@ -104,5 +124,6 @@ async function runE2E() {
         process.exit(1);
     }
 }
+
 
 runE2E();

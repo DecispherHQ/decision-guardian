@@ -442,10 +442,10 @@ PR Created → Parse Decisions → Match Files → Post Comment → Check Status
 ```
 
 **Key components:**
-- **Parser** (`parser.ts`): Markdown → structured data
-- **Matcher** (`matcher.ts`): Trie-based file matching
-- **Rule Evaluator** (`rule-evaluator.ts`): Advanced rules
-- **Comment Manager** (`comment.ts`): Idempotent PR comments
+- **Parser** (`src/core/parser.ts`): Markdown → structured data
+- **Matcher** (`src/core/matcher.ts`): Trie-based file matching
+- **Rule Evaluator** (`src/core/rule-evaluator.ts`): Advanced rules
+- **Comment Manager** (`src/adapters/github/comment.ts`): Idempotent PR comments
 
 
 ### Key Optimizations
