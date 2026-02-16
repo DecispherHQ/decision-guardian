@@ -40307,6 +40307,7 @@ const actions_logger_1 = __nccwpck_require__(5170);
 const github_provider_1 = __nccwpck_require__(125);
 const health_2 = __nccwpck_require__(4958);
 const zod_1 = __nccwpck_require__(924);
+const sender_1 = __nccwpck_require__(4894);
 // Create the logger for the entire action lifetime
 const logger = new actions_logger_1.ActionsLogger();
 /**
@@ -40509,6 +40510,7 @@ function reportMetrics() {
     logger.info(`Matches Found: ${snapshot.matches_found}`);
     logger.info(`Duration: ${snapshot.duration_ms}ms`);
     logger.setOutput('metrics', JSON.stringify(snapshot));
+    (0, sender_1.sendTelemetry)('action', snapshot, '1.0.0').catch(() => { });
 }
 /**
  * Process large PRs using streaming
@@ -40530,6 +40532,128 @@ async function processWithStreaming(decisions, provider) {
 }
 // Run the action
 run();
+
+
+/***/ }),
+
+/***/ 9721:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.buildPayload = buildPayload;
+function buildPayload(source, snapshot, version) {
+    return {
+        event: 'run_complete',
+        version,
+        source,
+        timestamp: new Date().toISOString(),
+        metrics: {
+            files_processed: snapshot.files_processed,
+            decisions_evaluated: snapshot.decisions_evaluated,
+            matches_found: snapshot.matches_found,
+            critical_matches: snapshot.critical_matches,
+            warning_matches: snapshot.warning_matches,
+            info_matches: snapshot.info_matches,
+            duration_ms: snapshot.duration_ms,
+        },
+        environment: {
+            node_version: process.version,
+            os_platform: process.platform,
+            ci: !!process.env.CI,
+        },
+    };
+}
+
+
+/***/ }),
+
+/***/ 2755:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.validatePrivacy = validatePrivacy;
+const BLOCKED_FIELDS = new Set([
+    'repo_name',
+    'org_name',
+    'file_names',
+    'file_paths',
+    'pr_title',
+    'pr_body',
+    'decision_content',
+    'user_names',
+    'github_token',
+    'commit_message',
+    'branch_name',
+    'author',
+    'email',
+]);
+function validatePrivacy(payload) {
+    const violations = findBlockedKeys(payload);
+    if (violations.length > 0) {
+        throw new Error(`Telemetry privacy violation: blocked fields found: ${violations.join(', ')}`);
+    }
+}
+function findBlockedKeys(obj, prefix = '') {
+    const violations = [];
+    for (const key of Object.keys(obj)) {
+        const fullKey = prefix ? `${prefix}.${key}` : key;
+        if (BLOCKED_FIELDS.has(key)) {
+            violations.push(fullKey);
+        }
+        if (obj[key] && typeof obj[key] === 'object' && !Array.isArray(obj[key])) {
+            violations.push(...findBlockedKeys(obj[key], fullKey));
+        }
+    }
+    return violations;
+}
+
+
+/***/ }),
+
+/***/ 4894:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.sendTelemetry = sendTelemetry;
+const payload_1 = __nccwpck_require__(9721);
+const privacy_1 = __nccwpck_require__(2755);
+const DEFAULT_ENDPOINT = 'https://telemetry.decispher.com/collect';
+const TIMEOUT_MS = 5000;
+function isOptedIn() {
+    if (process.env.DG_TELEMETRY === '0' || process.env.DG_TELEMETRY === 'false') {
+        return false;
+    }
+    return process.env.DG_TELEMETRY === '1' || process.env.DG_TELEMETRY === 'true';
+}
+function getEndpoint() {
+    return process.env.DG_TELEMETRY_URL || DEFAULT_ENDPOINT;
+}
+async function sendTelemetry(source, snapshot, version) {
+    if (!isOptedIn())
+        return;
+    try {
+        const payload = (0, payload_1.buildPayload)(source, snapshot, version);
+        (0, privacy_1.validatePrivacy)(payload);
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+        await fetch(getEndpoint(), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            signal: controller.signal,
+        });
+        clearTimeout(timer);
+    }
+    catch {
+        // Silently fail — never break the tool
+    }
+}
 
 
 /***/ }),

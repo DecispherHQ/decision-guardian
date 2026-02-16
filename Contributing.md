@@ -109,7 +109,7 @@ npm run build
 Decision Guardian is the **open-source GitHub Action** component of the Decispher ecosystem. Contributions should focus on:
 
 **In Scope:**
-- ✅ Bug fixes for the GitHub Action
+- ✅ Bug fixes for the GitHub Action and CLI
 - ✅ Performance improvements
 - ✅ Documentation improvements
 - ✅ Test coverage
@@ -117,12 +117,13 @@ Decision Guardian is the **open-source GitHub Action** component of the Decisphe
 - ✅ File pattern matching
 - ✅ Advanced rule evaluation
 - ✅ GitHub PR comment formatting
+- ✅ CLI commands and templates
+- ✅ New SCM provider adapters (GitLab, Bitbucket)
+- ✅ Telemetry improvements
 
 **Out of Scope:**
 - ❌ Proprietary Decispher features
-- ❌ Cloud-hosted services
 - ❌ Paid tier features
-- ❌ Integration with external platforms beyond GitHub
 
 ### Types of Contributions
 
@@ -163,25 +164,62 @@ We welcome:
 ```
 decision-guardian/
 ├── src/
-│   ├── main.ts              # Action entry point
-│   ├── parser.ts            # Decision file parser (Markdown)
-│   ├── matcher.ts           # Pattern matching engine (Trie-based)
-│   ├── rule-evaluator.ts   # Advanced rule evaluation
-│   ├── rule-parser.ts       # JSON rule parser
-│   ├── content-matchers.ts # Content matching (regex, string, line_range)
-│   ├── comment.ts           # GitHub PR comment management
-│   ├── github-utils.ts      # GitHub API utilities
-│   ├── trie.ts              # Prefix trie for pattern matching
-│   ├── metrics.ts           # Performance metrics
-│   ├── logger.ts            # Structured logging
-│   ├── health.ts            # Health validation
-│   ├── types.ts             # Core type definitions
-│   └── rule-types.ts        # Rule type definitions
-├── __tests__/               # Test files
-├── dist/                    # Compiled bundle (generated)
-├── action.yml               # GitHub Action metadata
-├── package.json             # Dependencies and scripts
-└── tsconfig.json            # TypeScript configuration
+│   ├── core/                         # Platform-agnostic engine
+│   │   ├── interfaces/
+│   │   │   ├── logger.ts             # ILogger interface
+│   │   │   ├── scm-provider.ts       # ISCMProvider interface
+│   │   │   └── index.ts
+│   │   ├── parser.ts                 # Decision file parser
+│   │   ├── matcher.ts                # Pattern matching (Trie-based)
+│   │   ├── rule-evaluator.ts         # Advanced rule evaluation
+│   │   ├── content-matchers.ts       # Content matching modes
+│   │   ├── trie.ts                   # Prefix trie
+│   │   ├── metrics.ts                # Performance metrics
+│   │   ├── logger.ts                 # Structured logging
+│   │   ├── health.ts                 # Decision file validation
+│   │   ├── types.ts                  # Core types
+│   │   └── rule-types.ts             # Rule types
+│   │
+│   ├── adapters/
+│   │   ├── github/
+│   │   │   ├── actions-logger.ts     # ILogger → @actions/core
+│   │   │   ├── github-provider.ts    # ISCMProvider for GitHub
+│   │   │   ├── comment.ts            # PR comment management
+│   │   │   └── health.ts             # Token validation
+│   │   └── local/
+│   │       ├── console-logger.ts     # ILogger → colored console
+│   │       └── local-git-provider.ts # ISCMProvider via git diff
+│   │
+│   ├── cli/
+│   │   ├── index.ts                  # CLI entry point
+│   │   ├── commands/
+│   │   │   ├── check.ts              # check / checkall
+│   │   │   ├── init.ts               # init .decispher/
+│   │   │   └── template.ts           # template output
+│   │   ├── formatter.ts              # Colored output tables
+│   │   └── paths.ts                  # Template path resolution
+│   │
+│   ├── telemetry/
+│   │   ├── sender.ts                 # Opt-in HTTP sender
+│   │   ├── payload.ts                # Payload builder
+│   │   └── privacy.ts                # Blocklist validation
+│   │
+│   ├── main.ts                       # GitHub Action entry point
+│   └── logger.ts                     # logStructured() helper
+│
+├── templates/                        # Decision file templates
+├── workers/telemetry/                # Cloudflare Worker backend
+├── docs/                             # CLI, Architecture, Telemetry docs
+├── documentation/                    # Existing guides and roadmap
+├── tests/                            # Organized by module
+│   ├── core/
+│   ├── cli/
+│   ├── adapters/
+│   ├── telemetry/
+│   └── fixtures/
+├── action.yml                        # GitHub Action metadata
+├── package.json
+└── tsconfig.json
 ```
 
 ### Available Scripts
@@ -189,10 +227,11 @@ decision-guardian/
 ```bash
 # Development
 npm run build          # Compile TypeScript → JavaScript
-npm run package        # Bundle with @vercel/ncc → dist/index.js
+npm run bundle         # Bundle Action with @vercel/ncc → dist/index.js
+npm run build:cli      # Bundle CLI → dist/cli/index.js (~430KB)
 
 # Testing
-npm test               # Run Jest test suite
+npm test               # Run Jest test suite (109 tests)
 npm run test:watch     # Run tests in watch mode
 npm run test:coverage  # Generate coverage report
 
@@ -201,9 +240,6 @@ npm run lint           # Run ESLint
 npm run lint:fix       # Auto-fix linting issues
 npm run format         # Format code with Prettier
 npm run format:check   # Check formatting without changes
-
-# Complete Verification
-npm run all            # format + lint + test + build + package
 ```
 
 ### Development Workflow
@@ -420,7 +456,10 @@ We follow [Conventional Commits](https://www.conventionalcommits.org/):
 - `rule-evaluator` - Rule evaluation logic
 - `content-matchers` - Content matching modes
 - `comment` - GitHub comment management
-- `github-utils` - GitHub API utilities
+- `github-provider` - GitHub API adapter
+- `local-git` - Local git adapter
+- `cli` - CLI commands and entry point
+- `telemetry` - Telemetry system
 - `trie` - Pattern trie optimization
 - `metrics` - Performance metrics
 - `logger` - Logging utilities

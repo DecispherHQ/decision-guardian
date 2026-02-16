@@ -217,13 +217,23 @@ Configure PR comment format:
 
 ## Release History
 
-### Version 1.0.0 (Current)
+### Version 1.0.0
 - Initial release
 - Core pattern matching
 - Advanced rules system
 - GitHub Action integration
 - Performance optimizations
 - Security features
+
+### Version 1.1.0
+- **CLI Package**: `npx decision-guardian` — run checks locally without GitHub Actions
+  - `check` / `checkall` — scan decisions against local git changes
+  - `init` — scaffold `.decispher/` directory
+  - `template` — print or save starter templates
+- **5 Decision Templates**: basic, advanced-rules, security, database, api
+- **Opt-in Telemetry**: privacy-first usage analytics with blocklist enforcement
+- **SOLID Architecture**: Core engine decoupled from GitHub — supports any SCM provider
+- **Platform-agnostic core**: Zero `@actions/*` imports in `src/core/`
 
 ---
 
@@ -240,9 +250,9 @@ Have a feature idea? We'd love to hear it!
 |---------|-------|--------|
 | VS Code extension | 🔼 0 | Under review |
 | Custom comment format | 🔼 0 | Under review |
-| Decision templates | 🔼 0 | Under review |
-| GitLab support | 🔼 0 | Under review |
-| Bitbucket support | 🔼 0 | Under review |
+| Decision templates | 🔼 0 | ✅ Shipped (v1.1) |
+| GitLab support | 🔼 0 | Architecture ready (ISCMProvider) |
+| Bitbucket support | 🔼 0 | Architecture ready (ISCMProvider) |
 
 ---
 
