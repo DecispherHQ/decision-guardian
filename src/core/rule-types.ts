@@ -52,8 +52,8 @@ export interface FileRule {
     /** Glob pattern to match file paths */
     pattern: string;
 
-    /** Optional glob pattern to exclude files */
-    exclude?: string;
+    /** Optional glob pattern(s) to exclude files */
+    exclude?: string | string[];
 
     /** Content rules to apply to matched files */
     content_rules?: ContentRule[];
@@ -76,8 +76,8 @@ export interface RuleCondition {
     /** File pattern for simple case */
     pattern?: string;
 
-    /** Exclusion pattern for simple case */
-    exclude?: string;
+    /** Exclusion pattern(s) for simple case */
+    exclude?: string | string[];
 
     /** Content rules for simple case */
     content_rules?: ContentRule[];

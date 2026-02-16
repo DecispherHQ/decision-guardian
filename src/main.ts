@@ -1,5 +1,6 @@
 import * as github from '@actions/github';
 import * as path from 'path';
+import * as fs from 'fs';
 import { DecisionParser } from './core/parser';
 import { FileMatcher } from './core/matcher';
 import { ActionConfig, DecisionMatch, Decision } from './core/types';
@@ -42,7 +43,12 @@ async function run(): Promise<void> {
     // 3. Parse decisions
     logger.startGroup('Parsing decisions...');
     const parser = new DecisionParser();
-    const parseResult = await parser.parseFile(config.decisionFile);
+
+    // Check if path is a directory and handle accordingly
+    const isDir = fs.existsSync(config.decisionFile) && fs.statSync(config.decisionFile).isDirectory();
+    const parseResult = isDir
+      ? await parser.parseDirectory(config.decisionFile)
+      : await parser.parseFile(config.decisionFile);
 
     if (parseResult.warnings.length > 0) {
       parseResult.warnings.forEach((warn) => {
@@ -74,6 +80,9 @@ async function run(): Promise<void> {
     const provider = new GitHubProvider(config.token, logger);
     const changedFiles = await provider.getChangedFiles();
     const useStreaming = changedFiles.length > 1000;
+
+    // Create FileMatcher once for all code paths
+    const matcher = new FileMatcher(parseResult.decisions, logger);
 
     let matches: DecisionMatch[];
     let processedFileCount = 0;
@@ -109,7 +118,6 @@ async function run(): Promise<void> {
 
       // 5. Match files to decisions
       logger.startGroup('Matching decisions...');
-      const matcher = new FileMatcher(parseResult.decisions, logger);
 
       try {
         matches = await matcher.findMatchesWithDiffs(fileDiffs);
@@ -120,7 +128,6 @@ async function run(): Promise<void> {
       }
     }
 
-    const matcher = new FileMatcher(parseResult.decisions, logger);
     const grouped = matcher.groupBySeverity(matches);
 
     metrics.addMatchesFound(matches.length);

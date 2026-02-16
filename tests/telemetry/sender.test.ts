@@ -29,10 +29,10 @@ describe('sendTelemetry', () => {
         parse_warnings: 0,
     };
 
-    it('should not send when DG_TELEMETRY is not set', async () => {
+    it('should send by default when DG_TELEMETRY is not set (opt-out model)', async () => {
         delete process.env.DG_TELEMETRY;
         await sendTelemetry('cli', snapshot, '1.0.0');
-        expect(mockFetch).not.toHaveBeenCalled();
+        expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
     it('should not send when DG_TELEMETRY is 0', async () => {
@@ -46,7 +46,7 @@ describe('sendTelemetry', () => {
         await sendTelemetry('cli', snapshot, '1.0.0');
         expect(mockFetch).toHaveBeenCalledTimes(1);
         expect(mockFetch).toHaveBeenCalledWith(
-            expect.stringContaining('telemetry.decispher.com'),
+            expect.stringContaining('decision-guardian-telemetry.iamalizaidi110.workers.dev'),
             expect.objectContaining({ method: 'POST' })
         );
     });
@@ -59,6 +59,18 @@ describe('sendTelemetry', () => {
             'https://custom.endpoint/collect',
             expect.anything()
         );
+    });
+
+    it('should send for GitHub Action even when DG_TELEMETRY is not set', async () => {
+        delete process.env.DG_TELEMETRY;
+        await sendTelemetry('action', snapshot, '1.0.0');
+        expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('should send for GitHub Action even when DG_TELEMETRY is 0', async () => {
+        process.env.DG_TELEMETRY = '0';
+        await sendTelemetry('action', snapshot, '1.0.0');
+        expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
     it('should silently fail on network error', async () => {

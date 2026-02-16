@@ -14,9 +14,6 @@ We take security seriously.
 
 ### Explicit Privacy & Security Guarantees
 
-❌ **No external network calls by default**
-The action does not make any outbound requests unless you explicitly opt into telemetry (`DG_TELEMETRY=1`).
-
 ❌ **No data leaves GitHub by default**
 Your code and decision data never leave the runner. Telemetry is opt-in only and never collects source code, file contents, repo names, or any identifying information.
 

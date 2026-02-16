@@ -33,14 +33,17 @@ jobs:
       - name: Build
         run: npm run build
       
-      - name: Bundle
+      - name: Bundle Action
         run: npm run bundle
+      
+      - name: Build CLI
+        run: npm run build:cli
       
       - name: Check dist/
         run: |
           if ! git diff --quiet --exit-code --ignore-space-at-eol -- dist/; then
             git --no-pager diff -- dist/
-            echo "Error: dist/ is out of date. Run 'npm run bundle' and commit."
+            echo "Error: dist/ is out of date. Run 'npm run bundle' and 'npm run build:cli' and commit."
             exit 1
           fi
 

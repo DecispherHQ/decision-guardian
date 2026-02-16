@@ -92,7 +92,6 @@ npx decision-guardian template advanced-rules
 ### 3. Opt-in Telemetry System
 
 **Privacy-first design:**
-- **Disabled by default** - must explicitly enable via `DG_TELEMETRY=1`
 - **Zero PII collection** - no source code, repo names, file names, usernames, emails
 - **Runtime blocklist** - privacy module validates every payload, throws on violation
 - **Fire-and-forget** - 5-second timeout, never blocks or affects tool behavior

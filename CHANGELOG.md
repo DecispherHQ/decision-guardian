@@ -48,7 +48,7 @@ npx decision-guardian init --template database
 #### **Opt-in Telemetry System**
 Privacy-first, anonymous usage analytics to improve Decision Guardian:
 
-- **Disabled by default** - Must explicitly opt-in via `DG_TELEMETRY=1` environment variable
+- **Enabled by default** - Must explicitly opt-out via `DG_TELEMETRY=0` environment variable
 - **Zero PII collection**:
   - ❌ No source code, file contents, or decision text
   - ❌ No repo names, org names, usernames, emails, commit messages, branch names, file names, or file paths
@@ -263,7 +263,6 @@ All backward-compatibility shims have been removed:
 ### 🔒 Security
 
 #### **Enhanced Privacy**
-- **No external network calls by default** - Telemetry is opt-in only (`DG_TELEMETRY=1`)
 - **Runtime blocklist enforcement** - Privacy module validates payloads before sending
 - **No PII in telemetry** - Comprehensive list of blocked fields enforced at module boundary
 - **Fire-and-forget** - Telemetry never affects tool behavior or exposes errors
