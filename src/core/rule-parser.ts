@@ -50,11 +50,16 @@ export class RuleParser {
                 const resolvedPath = path.resolve(sourceDir, relPath);
 
                 const normalizedWorkspace = path.normalize(workspaceRoot);
-                if (
-                    !resolvedPath.startsWith(normalizedWorkspace) &&
-                    !resolvedPath.includes('node_modules')
-                ) {
-                    // Path is outside workspace - future enhancement: add security warning
+                const normalizedPath = path.normalize(resolvedPath);
+
+                // Security check: Reject paths outside workspace (Path Traversal protection)
+                if (!normalizedPath.startsWith(normalizedWorkspace)) {
+                    return {
+                        rules: null,
+                        error: `Security Error: External rule file '${relPath}' resolves to a path outside the workspace. ` +
+                            `Only files within the workspace are allowed. ` +
+                            `Resolved: ${normalizedPath}, Workspace: ${normalizedWorkspace}`,
+                    };
                 }
 
                 const fileContent = await fs.readFile(resolvedPath, 'utf-8');
