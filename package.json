@@ -3,9 +3,19 @@
   "version": "1.0.0",
   "description": "Surface architectural decision context on Pull Requests",
   "main": "dist/index.js",
+  "bin": {
+    "decision-guardian": "./dist/cli/index.js"
+  },
+  "files": [
+    "dist/",
+    "templates/",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc",
     "bundle": "ncc build src/main.ts -o dist --license licenses.txt",
+    "build:cli": "ncc build src/cli/index.ts -o dist/cli --license licenses.txt",
     "test": "jest",
     "test:e2e": "npx ts-node scripts/e2e-test.ts",
     "lint": "eslint src/**/*.ts",

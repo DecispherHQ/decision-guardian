@@ -37877,7 +37877,103 @@ function wrappy (fn, cb) {
 
 /***/ }),
 
-/***/ 2246:
+/***/ 5170:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.ActionsLogger = void 0;
+/**
+ * ActionsLogger — ILogger implementation wrapping @actions/core.
+ *
+ * Used when running inside the GitHub Actions runtime.
+ */
+const core = __importStar(__nccwpck_require__(7484));
+class ActionsLogger {
+    info(message) {
+        core.info(message);
+    }
+    warning(message) {
+        core.warning(message);
+    }
+    error(message) {
+        core.error(message);
+    }
+    debug(message) {
+        core.debug(message);
+    }
+    startGroup(name) {
+        core.startGroup(name);
+    }
+    endGroup() {
+        core.endGroup();
+    }
+    // ── Actions-Specific Methods ──────────────────────────────────
+    /**
+     * Set an output variable for subsequent steps.
+     */
+    setOutput(name, value) {
+        core.setOutput(name, value);
+    }
+    /**
+     * Mark the action as failed with an error message.
+     */
+    setFailed(message) {
+        core.setFailed(message);
+    }
+    /**
+     * Get an input variable from the action configuration.
+     */
+    getInput(name, required) {
+        return core.getInput(name, { required });
+    }
+    /**
+     * Get a boolean input variable from the action configuration.
+     */
+    getBooleanInput(name) {
+        return core.getBooleanInput(name);
+    }
+}
+exports.ActionsLogger = ActionsLogger;
+
+
+/***/ }),
+
+/***/ 2511:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -37917,15 +38013,19 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.CommentManager = void 0;
+/**
+ * CommentManager — GitHub PR commenting logic.
+ */
 const github = __importStar(__nccwpck_require__(3228));
-const core = __importStar(__nccwpck_require__(7484));
 const crypto = __importStar(__nccwpck_require__(6982));
 class CommentManager {
     octokit;
+    logger;
     MARKER = '<!-- decision-guardian-v1 -->';
-    MAX_COMMENT_LENGTH = 60000; // GitHub API limit is 65536
-    constructor(token) {
+    MAX_COMMENT_LENGTH = 60000;
+    constructor(token, logger) {
         this.octokit = github.getOctokit(token);
+        this.logger = logger;
     }
     /**
      * Post or update comment on PR with decision alerts
@@ -37940,7 +38040,7 @@ class CommentManager {
             catch (error) {
                 const errWithStatus = error;
                 if (errWithStatus.status === 409 && retry < MAX_RETRIES - 1) {
-                    core.warning(`Conflict detected when posting comment, retrying... (${retry + 1}/${MAX_RETRIES})`);
+                    this.logger.warning(`Conflict detected when posting comment, retrying... (${retry + 1}/${MAX_RETRIES})`);
                     await new Promise((r) => setTimeout(r, 1000 * (retry + 1)));
                     continue;
                 }
@@ -37948,9 +38048,6 @@ class CommentManager {
             }
         }
     }
-    /**
-     * Core logic for posting or updating comment
-     */
     async _postAlertAttempt(matches, prContext) {
         matches.sort((a, b) => {
             const idCompare = a.decision.id.localeCompare(b.decision.id);
@@ -37969,7 +38066,7 @@ class CommentManager {
         else {
             const context = github.context;
             if (!context.payload.pull_request) {
-                core.warning('Not a pull request event, skipping comment');
+                this.logger.warning('Not a pull request event, skipping comment');
                 return;
             }
             owner = context.repo.owner;
@@ -37981,68 +38078,82 @@ class CommentManager {
         const existingComments = await this.findExistingComments(owner, repo, pull_number);
         let targetComment = existingComments.length > 0 ? existingComments[0] : null;
         if (existingComments.length > 1) {
-            core.info(`Found ${existingComments.length} duplicate comments, cleaning up...`);
+            this.logger.info(`Found ${existingComments.length} duplicate comments, cleaning up...`);
             for (let i = 1; i < existingComments.length; i++) {
                 try {
-                    await this.octokit.rest.issues.deleteComment({ owner, repo, comment_id: existingComments[i].id });
+                    await this.octokit.rest.issues.deleteComment({
+                        owner,
+                        repo,
+                        comment_id: existingComments[i].id,
+                    });
                 }
                 catch (error) {
-                    core.warning(`Failed to delete duplicate comment ${existingComments[i].id}: ${error}`);
+                    this.logger.warning(`Failed to delete duplicate comment ${existingComments[i].id}: ${error}`);
                 }
             }
         }
         if (targetComment) {
             const oldHash = this.extractHash(targetComment.body);
             if (oldHash === newHash) {
-                core.info('Existing comment is up-to-date, skipping update');
+                this.logger.info('Existing comment is up-to-date, skipping update');
                 return;
             }
             try {
-                await this.octokit.rest.issues.updateComment({ owner, repo, comment_id: targetComment.id, body: newBody });
-                core.info(`Updated existing comment (${matches.length} matches)`);
+                await this.octokit.rest.issues.updateComment({
+                    owner,
+                    repo,
+                    comment_id: targetComment.id,
+                    body: newBody,
+                });
+                this.logger.info(`Updated existing comment (${matches.length} matches)`);
                 return;
             }
             catch (error) {
                 const errWithStatus = error;
                 if (errWithStatus.status === 404) {
-                    core.warning(`Comment ${targetComment.id} was deleted, creating new one`);
+                    this.logger.warning(`Comment ${targetComment.id} was deleted, creating new one`);
                     targetComment = null;
                 }
                 else {
                     const message = error instanceof Error ? error.message : String(error);
-                    core.error(`Failed to update comment: ${message}`);
+                    this.logger.error(`Failed to update comment: ${message}`);
                     throw error;
                 }
             }
         }
         if (!targetComment) {
             try {
-                await this.octokit.rest.issues.createComment({ owner, repo, issue_number: pull_number, body: newBody });
-                core.info(`Posted new decision alert (${matches.length} matches)`);
+                await this.octokit.rest.issues.createComment({
+                    owner,
+                    repo,
+                    issue_number: pull_number,
+                    body: newBody,
+                });
+                this.logger.info(`Posted new decision alert (${matches.length} matches)`);
             }
             catch (error) {
                 const message = error instanceof Error ? error.message : String(error);
-                core.error(`Failed to post comment: ${message}`);
+                this.logger.error(`Failed to post comment: ${message}`);
                 throw error;
             }
         }
     }
-    /**
-     * Find all existing Decision Guardian comments
-     */
     async findExistingComments(owner, repo, issue_number) {
         try {
-            const { data: comments } = await this.octokit.rest.issues.listComments({ owner, repo, issue_number, });
-            return comments.filter((c) => c.body?.includes(this.MARKER)).map((c) => ({ id: c.id, body: c.body || '' }));
+            const { data: comments } = await this.octokit.rest.issues.listComments({
+                owner,
+                repo,
+                issue_number,
+            });
+            return comments
+                .filter((c) => c.body?.includes(this.MARKER))
+                .map((c) => ({ id: c.id, body: c.body || '' }));
         }
         catch (error) {
-            core.warning('Failed to fetch existing comments, will create new');
+            this.logger.warning('Failed to fetch existing comments, will create new');
             return [];
         }
     }
-    /**
-     * Generate content hash based on decision IDs, files, and matched patterns
-     */
     hashContent(matches) {
         const key = matches
             .map((m) => `${m.decision.id}:${m.file}:${m.matchDetails?.matchedPatterns?.join(',') || ''}`)
@@ -38050,31 +38161,22 @@ class CommentManager {
             .join('|');
         return crypto.createHash('sha256').update(key, 'utf8').digest('hex').substring(0, 16);
     }
-    /**
-     * Extract hash from existing comment
-     */
     extractHash(commentBody) {
         const match = commentBody.match(/<!-- hash:([a-f0-9-]+) -->/);
         return match ? match[1] : null;
     }
-    /**
-     * Format matches into markdown comment
-     */
     formatComment(matches, hash) {
         const fullComment = this.buildFullComment(matches, hash);
         if (fullComment.length > this.MAX_COMMENT_LENGTH) {
-            core.warning(`Comment would exceed ${this.MAX_COMMENT_LENGTH} chars (${fullComment.length}), truncating...`);
+            this.logger.warning(`Comment would exceed ${this.MAX_COMMENT_LENGTH} chars (${fullComment.length}), truncating...`);
             return this.buildTruncatedComment(matches, hash);
         }
         return fullComment;
     }
-    /**
-     * Build the full comment without truncation
-     */
     buildFullComment(matches, hash) {
         const grouped = this.groupBySeverity(matches);
-        const uniqueFiles = new Set(matches.map(m => m.file)).size;
-        const uniqueDecisions = new Set(matches.map(m => m.decision.id)).size;
+        const uniqueFiles = new Set(matches.map((m) => m.file)).size;
+        const uniqueDecisions = new Set(matches.map((m) => m.decision.id)).size;
         let comment = `${this.MARKER}\n`;
         comment += `<!-- hash:${hash} -->\n\n`;
         comment += `## ⚠️ Decision Context Alert\n\n`;
@@ -38102,9 +38204,6 @@ class CommentManager {
         comment += `Update decisions in your \`.decispher/\` folder if needed.*\n`;
         return comment;
     }
-    /**
-     * Build truncated comment when full comment exceeds GitHub's limit
-     */
     buildTruncatedComment(matches, hash) {
         const detailLimits = [20, 10, 5, 2, 0];
         const fileLimitsPerDecision = [10, 5, 3, 1];
@@ -38120,16 +38219,13 @@ class CommentManager {
         if (ultraCompact.length <= this.MAX_COMMENT_LENGTH) {
             return ultraCompact;
         }
-        core.warning(`Comment still too long (${ultraCompact.length} chars), applying hard truncation`);
+        this.logger.warning(`Comment still too long (${ultraCompact.length} chars), applying hard truncation`);
         return this.hardTruncate(ultraCompact);
     }
-    /**
-     * Build truncated comment with specific limits for detailed matches and files per decision
-     */
     buildTruncatedCommentWithLimits(matches, hash, maxDetailedMatches, maxFilesPerDecision) {
         const grouped = this.groupBySeverity(matches);
-        const uniqueFiles = new Set(matches.map(m => m.file)).size;
-        const uniqueDecisions = new Set(matches.map(m => m.decision.id)).size;
+        const uniqueFiles = new Set(matches.map((m) => m.file)).size;
+        const uniqueDecisions = new Set(matches.map((m) => m.decision.id)).size;
         let comment = `${this.MARKER}\n`;
         comment += `<!-- hash:${hash} -->\n\n`;
         comment += `## ⚠️ Decision Context Alert\n\n`;
@@ -38180,9 +38276,6 @@ class CommentManager {
         comment += `Showing ${detailedCount} of ${matches.length} matches.*\n`;
         return comment;
     }
-    /**
-     * Build ultra-compact comment showing only counts (last resort before hard truncation)
-     */
     buildUltraCompactComment(matches, hash) {
         const grouped = this.groupBySeverity(matches);
         const byDecision = new Map();
@@ -38198,7 +38291,7 @@ class CommentManager {
                 });
             }
         }
-        const uniqueFiles = new Set(matches.map(m => m.file)).size;
+        const uniqueFiles = new Set(matches.map((m) => m.file)).size;
         let comment = `${this.MARKER}\n`;
         comment += `<!-- hash:${hash} -->\n\n`;
         comment += `## ⚠️ Decision Context Alert\n\n`;
@@ -38225,9 +38318,6 @@ class CommentManager {
         comment += `Details truncated.*\n`;
         return comment;
     }
-    /**
-     * Hard truncate comment as final safety measure
-     */
     hardTruncate(comment) {
         const truncationNotice = `\n\n---\n*⚠️ Comment truncated due to GitHub's 65536 character limit.*\n`;
         const maxLength = this.MAX_COMMENT_LENGTH - truncationNotice.length;
@@ -38237,15 +38327,6 @@ class CommentManager {
         }
         return comment.substring(0, breakPoint) + truncationNotice;
     }
-    /**
-     * Build a compact summary section for matches that couldn't be shown in detail
-     */
-    buildSummarySectionForRemaining(matches) {
-        return this.buildSummarySectionForRemainingWithLimit(matches, 10);
-    }
-    /**
-     * Build a compact summary section with configurable file limit per decision
-     */
     buildSummarySectionForRemainingWithLimit(matches, maxFilesPerDecision) {
         const byDecision = new Map();
         for (const match of matches) {
@@ -38270,9 +38351,6 @@ class CommentManager {
         section += `</details>\n\n`;
         return section;
     }
-    /**
-     * Format a single match with link to source, blockquote context, and collapsible for long content
-     */
     formatMatch(match) {
         const escapeMarkdown = (str) => {
             return str.replace(/[\\`*_{}[\]()#+\-.!]/g, '\\$&');
@@ -38286,35 +38364,33 @@ class CommentManager {
             }
         }
         const matchType = matchDetails ? 'Rule-based' : 'File pattern';
-        // Build source file link (full GitHub blob URL)
         const workspaceRoot = process.env.GITHUB_WORKSPACE || process.cwd();
         let relativeSourceFile = decision.sourceFile;
         const normalizedSource = decision.sourceFile.replace(/\\/g, '/');
         const normalizedWorkspace = workspaceRoot.replace(/\\/g, '/');
         if (normalizedSource.startsWith(normalizedWorkspace)) {
-            relativeSourceFile = normalizedSource.substring(normalizedWorkspace.length).replace(/^\//, '');
+            relativeSourceFile = normalizedSource
+                .substring(normalizedWorkspace.length)
+                .replace(/^\//, '');
         }
-        // Construct full GitHub blob URL for the source file (if context available)
         let sourceLink;
         const context = github.context;
         if (context?.repo?.owner && context?.repo?.repo) {
             const repoUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}`;
             const ref = context.payload?.pull_request?.head?.sha || context.sha || 'HEAD';
             const blobUrl = `${repoUrl}/blob/${ref}/${relativeSourceFile}`;
-            sourceLink = decision.lineNumber > 0
-                ? `[${relativeSourceFile}](${blobUrl}#L${decision.lineNumber})`
-                : `[${relativeSourceFile}](${blobUrl})`;
+            sourceLink =
+                decision.lineNumber > 0
+                    ? `[${relativeSourceFile}](${blobUrl}#L${decision.lineNumber})`
+                    : `[${relativeSourceFile}](${blobUrl})`;
         }
         else {
-            // Fallback when context is not available
             sourceLink = `\`${relativeSourceFile}\``;
         }
-        // Format context with blockquote, collapsible if long (>300 chars)
         const contextText = decision.context.trim();
         const CONTEXT_THRESHOLD = 300;
         let contextSection;
         if (contextText.length > CONTEXT_THRESHOLD) {
-            // Long context: use collapsible
             const preview = contextText.substring(0, 150).trim() + '...';
             contextSection = `> ${escapeMarkdown(preview)}\n\n`;
             contextSection += `<details>\n<summary>📖 Read full context</summary>\n\n`;
@@ -38322,7 +38398,6 @@ class CommentManager {
             contextSection += `</details>\n`;
         }
         else {
-            // Short context: use simple blockquote
             contextSection = `> ${escapeMarkdown(contextText).split('\n').join('\n> ')}\n`;
         }
         return `
@@ -38341,9 +38416,6 @@ ${contextSection}
 
 `;
     }
-    /**
-     * Group matches by severity
-     */
     groupBySeverity(matches) {
         return {
             critical: matches.filter((m) => m.decision.severity === 'critical'),
@@ -38357,7 +38429,319 @@ exports.CommentManager = CommentManager;
 
 /***/ }),
 
-/***/ 3632:
+/***/ 125:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.GitHubProvider = void 0;
+/**
+ * GitHubProvider — ISCMProvider for GitHub Actions context.
+ *
+ * Wraps the existing github-utils.ts logic behind the ISCMProvider interface.
+ * All @actions/github usage is contained here.
+ */
+const github = __importStar(__nccwpck_require__(3228));
+const metrics_1 = __nccwpck_require__(3010);
+const comment_1 = __nccwpck_require__(2511);
+const MAX_RETRIES = 3;
+const MAX_WAIT_TIME_MS = 6 * 60 * 1000; // 6 minutes
+class GitHubProvider {
+    octokit;
+    logger;
+    token;
+    owner;
+    repo;
+    pullNumber;
+    commentManager;
+    constructor(token, logger) {
+        this.token = token;
+        this.logger = logger;
+        this.octokit = github.getOctokit(token);
+        this.commentManager = new comment_1.CommentManager(token, logger);
+        const context = github.context;
+        if (!context.payload.pull_request) {
+            throw new Error('This action only works on pull_request events');
+        }
+        this.owner = context.repo.owner;
+        this.repo = context.repo.repo;
+        this.pullNumber = context.payload.pull_request.number;
+    }
+    /**
+     * Get list of changed file paths in the PR.
+     */
+    async getChangedFiles() {
+        const files = [];
+        let page = 1;
+        const MAX_PAGES = 30;
+        while (page <= MAX_PAGES) {
+            const { data } = await this.executeWithRateLimit(() => this.octokit.rest.pulls.listFiles({
+                owner: this.owner,
+                repo: this.repo,
+                pull_number: this.pullNumber,
+                per_page: 100,
+                page,
+            }), `fetch files page ${page}`);
+            files.push(...data.map((f) => f.filename.replace(/\\/g, '/')));
+            this.logger.debug(`Fetched page ${page}: ${data.length} files`);
+            if (data.length < 100)
+                break;
+            page++;
+        }
+        if (page > MAX_PAGES) {
+            this.logger.warning('PR has 3000+ files - only checking first 3000');
+        }
+        return files;
+    }
+    /**
+     * Get file diffs with patch content for advanced rule matching.
+     */
+    async getFileDiffs() {
+        const firstPage = await this.executeWithRateLimit(() => this.octokit.rest.pulls.listFiles({
+            owner: this.owner,
+            repo: this.repo,
+            pull_number: this.pullNumber,
+            per_page: 100,
+            page: 1,
+        }), 'fetch files page 1');
+        if (firstPage.data.length < 100) {
+            this.logger.debug(`Fetched all ${firstPage.data.length} file diffs in single request`);
+            return firstPage.data.map((f) => ({
+                filename: f.filename.replace(/\\/g, '/'),
+                status: f.status,
+                additions: f.additions,
+                deletions: f.deletions,
+                changes: f.changes,
+                patch: f.patch || '',
+                previous_filename: f.previous_filename,
+            }));
+        }
+        const fileMap = new Map();
+        let page = 1;
+        const MAX_PAGES = 30;
+        while (page <= MAX_PAGES) {
+            const { data } = page === 1
+                ? firstPage
+                : await this.executeWithRateLimit(() => this.octokit.rest.pulls.listFiles({
+                    owner: this.owner,
+                    repo: this.repo,
+                    pull_number: this.pullNumber,
+                    per_page: 100,
+                    page,
+                }), `fetch diffs page ${page}`);
+            if (data.length === 0)
+                break;
+            for (const file of data) {
+                const normalized = file.filename.replace(/\\/g, '/');
+                fileMap.set(normalized, {
+                    filename: normalized,
+                    status: file.status,
+                    additions: file.additions,
+                    deletions: file.deletions,
+                    changes: file.changes,
+                    patch: file.patch || '',
+                    previous_filename: file.previous_filename,
+                });
+            }
+            this.logger.debug(`Fetched page ${page}: ${data.length} file diffs`);
+            if (data.length < 100)
+                break;
+            page++;
+        }
+        if (page > MAX_PAGES) {
+            this.logger.warning('PR has 3000+ files - only checking first 3000');
+        }
+        return Array.from(fileMap.values());
+    }
+    /**
+     * Stream file diffs for very large PRs.
+     */
+    async *streamFileDiffs() {
+        let page = 1;
+        const MAX_PAGES = 30;
+        while (page <= MAX_PAGES) {
+            const { data } = await this.executeWithRateLimit(() => this.octokit.rest.pulls.listFiles({
+                owner: this.owner,
+                repo: this.repo,
+                pull_number: this.pullNumber,
+                per_page: 100,
+                page,
+            }), `stream diffs page ${page}`);
+            if (data.length === 0)
+                break;
+            yield data.map((f) => ({
+                filename: f.filename.replace(/\\/g, '/'),
+                status: f.status,
+                additions: f.additions,
+                deletions: f.deletions,
+                changes: f.changes,
+                patch: f.patch || '',
+                previous_filename: f.previous_filename,
+            }));
+            if (data.length < 100)
+                break;
+            page++;
+        }
+    }
+    /**
+     * Post decision alerts as PR comment.
+     */
+    async postComment(matches) {
+        await this.commentManager.postAlert(matches, {
+            owner: this.owner,
+            repo: this.repo,
+            number: this.pullNumber,
+        });
+    }
+    /**
+     * Execute with rate limit handling (Circuit Breaker pattern).
+     */
+    async executeWithRateLimit(operation, description) {
+        let lastError;
+        for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+            try {
+                metrics_1.metrics.incrementApiCall();
+                return await operation();
+            }
+            catch (error) {
+                const err = error;
+                lastError = error instanceof Error ? error : new Error(String(error));
+                const isRateLimit = (err.status === 403 && err.response?.headers['x-ratelimit-remaining'] === '0') ||
+                    err.status === 429;
+                if (!isRateLimit) {
+                    metrics_1.metrics.incrementApiError();
+                    throw error;
+                }
+                if (attempt >= MAX_RETRIES) {
+                    metrics_1.metrics.incrementApiError();
+                    throw error;
+                }
+                let waitMs = 60000;
+                if (err.response?.headers['x-ratelimit-reset']) {
+                    const resetTime = parseInt(err.response.headers['x-ratelimit-reset'], 10) * 1000;
+                    waitMs = Math.max(resetTime - Date.now() + 1000, 1000);
+                }
+                else if (err.response?.headers['retry-after']) {
+                    waitMs = parseInt(err.response.headers['retry-after'], 10) * 1000;
+                }
+                if (waitMs > MAX_WAIT_TIME_MS) {
+                    this.logger.error(`Rate limit hit for ${description}. ` +
+                        `Wait time (${Math.round(waitMs / 60000)}m) exceeds limit.`);
+                    throw error;
+                }
+                metrics_1.metrics.incrementRateLimitHit();
+                this.logger.warning(`Rate limit hit for ${description}. ` +
+                    `Waiting ${Math.round(waitMs / 1000)}s before retry ${attempt}/${MAX_RETRIES}`);
+                await new Promise((resolve) => setTimeout(resolve, waitMs));
+            }
+        }
+        throw lastError || new Error('Operation failed');
+    }
+}
+exports.GitHubProvider = GitHubProvider;
+
+
+/***/ }),
+
+/***/ 4958:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.validateToken = validateToken;
+/**
+ * GitHub-specific health check — validates GitHub token and API access.
+ */
+const github = __importStar(__nccwpck_require__(3228));
+/**
+ * Validate that the GitHub token has proper permissions.
+ */
+async function validateToken(token, logger) {
+    try {
+        const octokit = github.getOctokit(token);
+        const { owner, repo } = github.context.repo;
+        await octokit.rest.repos.get({ owner, repo });
+        return true;
+    }
+    catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        logger.error(`GitHub token validation failed: ${message}`);
+        return false;
+    }
+}
+
+
+/***/ }),
+
+/***/ 4716:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -38406,11 +38790,15 @@ exports.ContentMatchers = void 0;
 const parse_diff_1 = __importDefault(__nccwpck_require__(2673));
 const safe_regex_1 = __importDefault(__nccwpck_require__(895));
 const vm_1 = __importDefault(__nccwpck_require__(9154));
-const logger_1 = __nccwpck_require__(6999);
+const logger_1 = __nccwpck_require__(1227);
 const crypto = __importStar(__nccwpck_require__(6982));
 class ContentMatchers {
     resultCache = new Map();
     MAX_CACHE_SIZE = 500;
+    logger;
+    constructor(logger) {
+        this.logger = logger;
+    }
     /**
      * Match string patterns in changed lines
      */
@@ -38432,7 +38820,7 @@ class ContentMatchers {
      */
     async matchRegex(rule, fileDiff) {
         if (rule.pattern && !(0, safe_regex_1.default)(rule.pattern)) {
-            (0, logger_1.logStructured)('warning', `[Security] Unsafe regex pattern rejected`, {
+            (0, logger_1.logStructured)(this.logger, 'warning', `[Security] Unsafe regex pattern rejected`, {
                 pattern: rule.pattern,
             });
             return { matched: false, matchedPatterns: [] };
@@ -38440,14 +38828,14 @@ class ContentMatchers {
         const changedContent = this.getChangedLines(fileDiff.patch).join('\n');
         const MAX_CONTENT_SIZE = 1024 * 1024;
         if (changedContent.length > MAX_CONTENT_SIZE) {
-            (0, logger_1.logStructured)('warning', `[Security] Content exceeds size limit`, {
+            (0, logger_1.logStructured)(this.logger, 'warning', `[Security] Content exceeds size limit`, {
                 size: changedContent.length,
                 limit: MAX_CONTENT_SIZE,
             });
             return { matched: false, matchedPatterns: [] };
         }
         if (rule.pattern && rule.pattern.length > 1000) {
-            (0, logger_1.logStructured)('warning', `[Security] Regex pattern too complex`, {
+            (0, logger_1.logStructured)(this.logger, 'warning', `[Security] Regex pattern too complex`, {
                 length: rule.pattern.length,
             });
             return { matched: false, matchedPatterns: [] };
@@ -38469,7 +38857,7 @@ class ContentMatchers {
             };
         }
         catch (error) {
-            (0, logger_1.logStructured)('warning', `Regex check failed for pattern`, {
+            (0, logger_1.logStructured)(this.logger, 'warning', `Regex check failed for pattern`, {
                 pattern: rule.pattern,
                 error: String(error),
             });
@@ -38654,7 +39042,7 @@ exports.ContentMatchers = ContentMatchers;
 
 /***/ }),
 
-/***/ 496:
+/***/ 4365:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -38693,272 +39081,20 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.getChangedFiles = getChangedFiles;
-exports.getFileDiffs = getFileDiffs;
-exports.streamFileDiffs = streamFileDiffs;
-const github = __importStar(__nccwpck_require__(3228));
-const core = __importStar(__nccwpck_require__(7484));
-const metrics_1 = __nccwpck_require__(5670);
-const MAX_RETRIES = 3;
-const MAX_WAIT_TIME_MS = 6 * 60 * 1000; // 6 minutes max wait to avoid hanging CI
+exports.checkDecisionFileExists = checkDecisionFileExists;
 /**
- * Execute a function with rate limit handling (Circuit Breaker pattern)
- * Trips if:
- * 1. Wait time exceeds MAX_WAIT_TIME_MS (default 6 mins)
- * 2. Retry count exceeds MAX_RETRIES
- * 3. Error is not a rate limit error
+ * Core health checks — platform-agnostic portion.
  */
-async function executeWithRateLimit(operation, description) {
-    let lastError;
-    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-        try {
-            metrics_1.metrics.incrementApiCall();
-            return await operation();
-        }
-        catch (error) {
-            const err = error;
-            lastError = error instanceof Error ? error : new Error(String(error));
-            const isRateLimit = (err.status === 403 && err.response?.headers['x-ratelimit-remaining'] === '0') ||
-                err.status === 429;
-            if (!isRateLimit) {
-                metrics_1.metrics.incrementApiError();
-                throw error;
-            }
-            if (attempt >= MAX_RETRIES) {
-                metrics_1.metrics.incrementApiError();
-                throw error;
-            }
-            let waitMs = 60000;
-            if (err.response?.headers['x-ratelimit-reset']) {
-                const resetTime = parseInt(err.response.headers['x-ratelimit-reset'], 10) * 1000;
-                waitMs = Math.max(resetTime - Date.now() + 1000, 1000);
-            }
-            else if (err.response?.headers['retry-after']) {
-                waitMs = parseInt(err.response.headers['retry-after'], 10) * 1000;
-            }
-            if (waitMs > MAX_WAIT_TIME_MS) {
-                core.setFailed(`Rate limit hit for ${description}. ` +
-                    `Wait time (${Math.round(waitMs / 60000)}m) exceeds limit.`);
-                throw error;
-            }
-            metrics_1.metrics.incrementRateLimitHit();
-            core.warning(`Rate limit hit for ${description}. ` +
-                `Waiting ${Math.round(waitMs / 1000)}s before retry ${attempt}/${MAX_RETRIES}`);
-            await new Promise((resolve) => setTimeout(resolve, waitMs));
-        }
-    }
-    throw lastError || new Error('Operation failed');
-}
-/**
- * Get list of changed files in the PR with full pagination support
- */
-async function getChangedFiles(token, contextArgs) {
-    const octokit = github.getOctokit(token);
-    let owner;
-    let repo;
-    let pull_number;
-    if (contextArgs) {
-        ({ owner, repo, pull_number } = contextArgs);
-    }
-    else {
-        const context = github.context;
-        if (!context.payload.pull_request) {
-            throw new Error('This action only works on pull_request events');
-        }
-        owner = context.repo.owner;
-        repo = context.repo.repo;
-        pull_number = context.payload.pull_request.number;
-    }
-    const files = [];
-    let page = 1;
-    const MAX_PAGES = 30; // GitHub's max is 3000 files (100 * 30)
-    try {
-        while (page <= MAX_PAGES) {
-            const { data } = await executeWithRateLimit(() => octokit.rest.pulls.listFiles({ owner, repo, pull_number, per_page: 100, page, }), `fetch files page ${page}`);
-            files.push(...data.map((f) => f.filename.replace(/\\/g, '/')));
-            core.debug(`Fetched page ${page}: ${data.length} files`);
-            if (data.length < 100) {
-                break;
-            }
-            page++;
-        }
-        if (page > MAX_PAGES) {
-            core.warning('PR has 3000+ files - only checking first 3000');
-        }
-        return files;
-    }
-    catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        throw new Error(`Failed to fetch PR files: ${message}`);
-    }
-}
-/**
- * Get file diffs with patch content for advanced rule matching
- */
-async function getFileDiffs(token, contextArgs) {
-    const octokit = github.getOctokit(token);
-    let owner;
-    let repo;
-    let pull_number;
-    if (contextArgs) {
-        ({ owner, repo, pull_number } = contextArgs);
-    }
-    else {
-        const context = github.context;
-        if (!context.payload.pull_request) {
-            throw new Error('This action only works on pull_request events');
-        }
-        owner = context.repo.owner;
-        repo = context.repo.repo;
-        pull_number = context.payload.pull_request.number;
-    }
-    try {
-        const firstPage = await executeWithRateLimit(() => octokit.rest.pulls.listFiles({ owner, repo, pull_number, per_page: 100, page: 1, }), 'fetch files page 1');
-        if (firstPage.data.length < 100) {
-            core.debug(`Fetched all ${firstPage.data.length} file diffs in single request`);
-            return firstPage.data.map((f) => ({
-                filename: f.filename.replace(/\\/g, '/'),
-                status: f.status,
-                additions: f.additions,
-                deletions: f.deletions,
-                changes: f.changes,
-                patch: f.patch || '',
-                previous_filename: f.previous_filename,
-            }));
-        }
-        const fileMap = new Map();
-        let page = 1;
-        const MAX_PAGES = 30;
-        while (page <= MAX_PAGES) {
-            const { data } = page === 1
-                ? firstPage
-                : await executeWithRateLimit(() => octokit.rest.pulls.listFiles({ owner, repo, pull_number, per_page: 100, page, }), `fetch diffs page ${page}`);
-            if (data.length === 0)
-                break;
-            for (const file of data) {
-                const normalized = file.filename.replace(/\\/g, '/');
-                fileMap.set(normalized, {
-                    filename: normalized,
-                    status: file.status,
-                    additions: file.additions,
-                    deletions: file.deletions,
-                    changes: file.changes,
-                    patch: file.patch || '',
-                    previous_filename: file.previous_filename,
-                });
-            }
-            core.debug(`Fetched page ${page}: ${data.length} file diffs`);
-            if (data.length < 100)
-                break;
-            page++;
-        }
-        if (page > MAX_PAGES) {
-            core.warning('PR has 3000+ files - only checking first 3000');
-        }
-        return Array.from(fileMap.values());
-    }
-    catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        throw new Error(`Failed to fetch PR file diffs: ${message}`);
-    }
-}
-/**
- * Stream file diffs for very large PRs (3000+ files)
- */
-async function* streamFileDiffs(token, contextArgs) {
-    const octokit = github.getOctokit(token);
-    let owner;
-    let repo;
-    let pull_number;
-    if (contextArgs) {
-        ({ owner, repo, pull_number } = contextArgs);
-    }
-    else {
-        const context = github.context;
-        if (!context.payload.pull_request) {
-            throw new Error('This action only works on pull_request events');
-        }
-        owner = context.repo.owner;
-        repo = context.repo.repo;
-        pull_number = context.payload.pull_request.number;
-    }
-    let page = 1;
-    const MAX_PAGES = 30;
-    while (page <= MAX_PAGES) {
-        const { data } = await executeWithRateLimit(() => octokit.rest.pulls.listFiles({ owner, repo, pull_number, per_page: 100, page, }), `stream diffs page ${page}`);
-        if (data.length === 0)
-            break;
-        yield data.map((f) => ({
-            filename: f.filename.replace(/\\/g, '/'),
-            status: f.status,
-            additions: f.additions,
-            deletions: f.deletions,
-            changes: f.changes,
-            patch: f.patch || '',
-            previous_filename: f.previous_filename,
-        }));
-        if (data.length < 100)
-            break;
-        page++;
-    }
-}
-
-
-/***/ }),
-
-/***/ 5769:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
-
-"use strict";
-
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.validateHealth = validateHealth;
 const fs = __importStar(__nccwpck_require__(1943));
-const core = __importStar(__nccwpck_require__(7484));
-const github = __importStar(__nccwpck_require__(3228));
-async function validateHealth(config) {
+/**
+ * Check if a decision file or directory exists and is accessible.
+ */
+async function checkDecisionFileExists(filePath) {
     try {
-        await fs.access(config.decisionFile);
-        const octokit = github.getOctokit(config.token);
-        const { repo, owner } = github.context.repo;
-        await octokit.rest.repos.get({ owner, repo });
+        await fs.access(filePath);
         return true;
     }
-    catch (error) {
-        core.error(`Health check failed: ${error}`);
+    catch {
         return false;
     }
 }
@@ -38966,61 +39102,27 @@ async function validateHealth(config) {
 
 /***/ }),
 
-/***/ 6999:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+/***/ 1227:
+/***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
 
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.logStructured = logStructured;
-const core = __importStar(__nccwpck_require__(7484));
 /**
- * Log structured data to the GitHub Action log in a consistent format.
+ * Log structured data using the provided logger instance.
  */
-function logStructured(level, message, context) {
+function logStructured(logger, level, message, context) {
     const logMessage = context ? `${message} | ${JSON.stringify(context)}` : message;
     switch (level) {
         case 'info':
-            core.info(logMessage);
+            logger.info(logMessage);
             break;
         case 'warning':
-            core.warning(logMessage);
+            logger.warning(logMessage);
             break;
         case 'error':
-            core.error(logMessage);
+            logger.error(logMessage);
             break;
     }
 }
@@ -39028,310 +39130,28 @@ function logStructured(level, message, context) {
 
 /***/ }),
 
-/***/ 1730:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+/***/ 3005:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
 
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const core = __importStar(__nccwpck_require__(7484));
-const github = __importStar(__nccwpck_require__(3228));
-const path = __importStar(__nccwpck_require__(6928));
-const parser_1 = __nccwpck_require__(7196);
-const matcher_1 = __nccwpck_require__(6033);
-const comment_1 = __nccwpck_require__(2246);
-const github_utils_1 = __nccwpck_require__(496);
-const metrics_1 = __nccwpck_require__(5670);
-const logger_1 = __nccwpck_require__(6999);
-const zod_1 = __nccwpck_require__(924);
-const health_1 = __nccwpck_require__(5769);
-/**
- * Main entry point for the GitHub Action
- */
-async function run() {
-    const startTime = Date.now();
-    const errors = [];
-    try {
-        // 1. Load configuration
-        const config = loadConfig();
-        if (!(await (0, health_1.validateHealth)(config))) {
-            core.setFailed('System health check failed');
-            return;
-        }
-        core.info(`Decision file: ${config.decisionFile}`);
-        // 2. Parse decisions
-        core.startGroup('Parsing decisions...');
-        const parser = new parser_1.DecisionParser();
-        const parseResult = await parser.parseFile(config.decisionFile);
-        if (parseResult.warnings.length > 0) {
-            parseResult.warnings.forEach((warn) => {
-                core.warning(warn);
-            });
-        }
-        if (parseResult.errors.length > 0) {
-            core.warning(`Found ${parseResult.errors.length} parse errors`);
-            parseResult.errors.forEach((err) => {
-                core.warning(`Line ${err.line}: ${err.message}`);
-            });
-            if (config.failOnError) {
-                core.setFailed(`Decision file has ${parseResult.errors.length} parse errors`);
-                return;
-            }
-        }
-        const hasRules = parseResult.decisions.some((d) => d.rules);
-        core.info(`Loaded ${parseResult.decisions.length} decisions (${hasRules ? 'with advanced rules' : 'file-based only'})`);
-        core.endGroup();
-        // 3. Check PR size and choose processing mode
-        core.startGroup('Fetching file diffs...');
-        const changedFiles = await (0, github_utils_1.getChangedFiles)(config.token);
-        const useStreaming = changedFiles.length > 1000;
-        let matches;
-        let processedFileCount = 0;
-        if (useStreaming) {
-            core.info(`Large PR detected (${changedFiles.length} files), using streaming mode`);
-            core.endGroup();
-            core.startGroup('Processing with streaming...');
-            matches = await processWithStreaming(parser, parseResult.decisions, config.token);
-            processedFileCount = changedFiles.length;
-            core.endGroup();
-        }
-        else {
-            const fileDiffs = await (0, github_utils_1.getFileDiffs)(config.token);
-            processedFileCount = fileDiffs.length;
-            metrics_1.metrics.addFilesProcessed(fileDiffs.length);
-            core.info(`PR modifies ${fileDiffs.length} files`);
-            if (fileDiffs.length === 0) {
-                core.info('No file diffs found - PR is clear!');
-                core.setOutput('matches_found', 0);
-                core.setOutput('critical_count', 0);
-                (0, logger_1.logStructured)('info', 'Decision Guardian completed successfully (no files)', {
-                    duration_ms: Date.now() - startTime,
-                });
-                metrics_1.metrics.setDuration(Date.now() - startTime);
-                metrics_1.metrics.report();
-                return;
-            }
-            core.endGroup();
-            // 4. Match files to decisions
-            core.startGroup('Matching decisions...');
-            const matcher = new matcher_1.FileMatcher(parseResult.decisions);
-            try {
-                matches = await matcher.findMatchesWithDiffs(fileDiffs);
-            }
-            catch (error) {
-                core.warning(`Advanced matching failed, falling back to simple mode: ${error}`);
-                const fileNames = fileDiffs.map((f) => f.filename);
-                matches = await matcher.findMatches(fileNames);
-            }
-        }
-        const matcher = new matcher_1.FileMatcher(parseResult.decisions);
-        const grouped = matcher.groupBySeverity(matches);
-        metrics_1.metrics.addMatchesFound(matches.length);
-        core.info(`Found ${matches.length} matches:`);
-        core.info(`  - Critical: ${grouped.critical.length}`);
-        core.info(`  - Warning: ${grouped.warning.length}`);
-        core.info(`  - Info: ${grouped.info.length}`);
-        core.endGroup();
-        // 5. Post comment if matches found
-        if (matches.length > 0) {
-            core.startGroup('Posting PR comment...');
-            const commentManager = new comment_1.CommentManager(config.token);
-            await commentManager.postAlert(matches);
-            core.endGroup();
-            core.setOutput('matches_found', matches.length);
-            core.setOutput('critical_count', grouped.critical.length);
-            // 6. Fail check if critical decisions violated and config says so
-            if (config.failOnCritical && grouped.critical.length > 0) {
-                const failureMessage = `PR modifies ${grouped.critical.length} files protected by critical decisions`;
-                (0, logger_1.logStructured)('error', 'Decision Guardian failed checks', {
-                    match_count: matches.length,
-                    critical_count: grouped.critical.length,
-                    duration_ms: Date.now() - startTime,
-                });
-                core.setFailed(failureMessage);
-                metrics_1.metrics.setDuration(Date.now() - startTime);
-                metrics_1.metrics.report();
-                return;
-            }
-        }
-        else {
-            core.info('No decision matches found - PR is clear!');
-            core.setOutput('matches_found', 0);
-            core.setOutput('critical_count', 0);
-        }
-        if (config.telemetryEnabled) {
-            core.info(`Telemetry: Decision Guardian run completed. Matches: ${matches.length}, Critical: ${grouped.critical.length}`);
-        }
-        const duration = Date.now() - startTime;
-        (0, logger_1.logStructured)('info', 'Decision Guardian completed successfully', {
-            pr_number: github.context.payload.pull_request?.number,
-            file_count: processedFileCount,
-            decision_count: parseResult.decisions.length,
-            match_count: matches.length,
-            duration_ms: duration,
-        });
-        metrics_1.metrics.setDuration(duration);
-        metrics_1.metrics.report();
-        core.info('✅ Decision Guardian completed successfully');
-    }
-    catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        const stack = error instanceof Error ? error.stack : undefined;
-        errors.push(message);
-        (0, logger_1.logStructured)('error', 'Decision Guardian failed', {
-            duration_ms: Date.now() - startTime,
-            errors,
-        });
-        core.setFailed(`Action failed: ${message}`);
-        if (stack) {
-            core.debug(stack);
-        }
-        metrics_1.metrics.setDuration(Date.now() - startTime);
-        metrics_1.metrics.report();
-    }
-}
-const ConfigSchema = zod_1.z.object({
-    decisionFile: zod_1.z
-        .string()
-        .regex(/^[a-zA-Z0-9._/-]+$/, 'Invalid characters in decision file path')
-        .refine((val) => !val.includes('..'), 'Path traversal not allowed'),
-    failOnCritical: zod_1.z.boolean(),
-    failOnError: zod_1.z.boolean(),
-    telemetryEnabled: zod_1.z.boolean(),
-    token: zod_1.z.string().min(1, 'Token cannot be empty'),
-});
-/**
- * Load action configuration from inputs
- */
-function loadConfig() {
-    const rawConfig = {
-        decisionFile: core.getInput('decision_file') || '.decispher/decisions.md',
-        failOnCritical: core.getBooleanInput('fail_on_critical'),
-        failOnError: core.getBooleanInput('fail_on_error'),
-        telemetryEnabled: core.getBooleanInput('telemetry_enabled'),
-        token: core.getInput('token', { required: true }),
-    };
-    const result = ConfigSchema.safeParse(rawConfig);
-    if (!result.success) {
-        const errorMessage = result.error.issues
-            .map((e) => `${e.path.join('.')}: ${e.message}`)
-            .join(', ');
-        throw new Error(`Invalid configuration: ${errorMessage}`);
-    }
-    if (path.isAbsolute(result.data.decisionFile)) {
-        throw new Error('decision_file must be a relative path');
-    }
-    const config = result.data;
-    core.debug(`Configuration loaded: ${JSON.stringify({
-        ...config,
-        token: '***',
-    })}`);
-    return config;
-}
-/**
- * Process large PRs using streaming
- */
-async function processWithStreaming(_parser, decisions, token) {
-    const matcher = new matcher_1.FileMatcher(decisions);
-    const allMatches = [];
-    let processedCount = 0;
-    for await (const batch of (0, github_utils_1.streamFileDiffs)(token)) {
-        const batchMatches = await matcher.findMatchesWithDiffs(batch);
-        allMatches.push(...batchMatches);
-        processedCount += batch.length;
-        core.info(`Processed ${processedCount} files, found ${allMatches.length} matches so far`);
-    }
-    return allMatches;
-}
-// Run the action
-run();
-
-
-/***/ }),
-
-/***/ 6033:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
-
-"use strict";
-
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.FileMatcher = void 0;
+/**
+ * FileMatcher — matches changed files against decision patterns.
+ */
 const minimatch_1 = __nccwpck_require__(6507);
-const trie_1 = __nccwpck_require__(6224);
-const rule_evaluator_1 = __nccwpck_require__(9785);
-const core = __importStar(__nccwpck_require__(7484));
-const metrics_1 = __nccwpck_require__(5670);
+const trie_1 = __nccwpck_require__(1599);
+const rule_evaluator_1 = __nccwpck_require__(5749);
+const metrics_1 = __nccwpck_require__(3010);
 class FileMatcher {
     normalizedDecisions;
     trie;
-    ruleEvaluator = new rule_evaluator_1.RuleEvaluator();
-    constructor(decisions) {
+    ruleEvaluator;
+    logger;
+    constructor(decisions, logger) {
+        this.logger = logger;
+        this.ruleEvaluator = new rule_evaluator_1.RuleEvaluator(logger);
         this.normalizedDecisions = decisions.map((d) => ({
             ...d,
             files: d.files.map((f) => f.replace(/\\/g, '/').normalize('NFC')),
@@ -39390,7 +39210,7 @@ class FileMatcher {
             const totalBatches = Math.ceil(ruleDecisions.length / CONCURRENCY);
             for (let i = 0; i < ruleDecisions.length; i += CONCURRENCY) {
                 const batchNum = Math.floor(i / CONCURRENCY) + 1;
-                core.debug(`Processing rule batch ${batchNum}/${totalBatches}...`);
+                this.logger.debug(`Processing rule batch ${batchNum}/${totalBatches}...`);
                 const batch = ruleDecisions.slice(i, i + CONCURRENCY);
                 const batchResults = await Promise.allSettled(batch.map(async (decision) => {
                     const result = await this.ruleEvaluator.evaluate(decision.rules, fileDiffs);
@@ -39409,8 +39229,8 @@ class FileMatcher {
                     .map((r) => r.value);
                 const failures = batchResults.filter((r) => r.status === 'rejected');
                 if (failures.length > 0) {
-                    core.warning(`${failures.length} decision evaluations failed in this batch. Check debug logs for details.`);
-                    failures.forEach((f) => core.debug(`Decision evaluation failed: ${f.reason}`));
+                    this.logger.warning(`${failures.length} decision evaluations failed in this batch. Check debug logs for details.`);
+                    failures.forEach((f) => this.logger.debug(`Decision evaluation failed: ${f.reason}`));
                 }
                 matches.push(...successfulResults);
             }
@@ -39499,98 +39319,102 @@ exports.FileMatcher = FileMatcher;
 
 /***/ }),
 
-/***/ 5670:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+/***/ 3010:
+/***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
 
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
+/**
+ * MetricsCollector — Platform-agnostic performance metrics.
+ */
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.metrics = exports.MetricsCollector = void 0;
-const core = __importStar(__nccwpck_require__(7484));
-// metrics.ts - Track performance metrics
 class MetricsCollector {
-    metrics = {
+    data = {
         api_calls: 0,
         api_errors: 0,
         rate_limit_hits: 0,
         files_processed: 0,
         decisions_evaluated: 0,
         matches_found: 0,
+        critical_matches: 0,
+        warning_matches: 0,
+        info_matches: 0,
         duration_ms: 0,
+        parse_errors: 0,
+        parse_warnings: 0,
     };
     incrementApiCall() {
-        this.metrics.api_calls++;
+        this.data.api_calls++;
     }
     incrementApiError() {
-        this.metrics.api_errors++;
+        this.data.api_errors++;
     }
     incrementRateLimitHit() {
-        this.metrics.rate_limit_hits++;
+        this.data.rate_limit_hits++;
     }
     addFilesProcessed(count) {
-        this.metrics.files_processed += count;
+        this.data.files_processed += count;
     }
     addDecisionsEvaluated(count) {
-        this.metrics.decisions_evaluated += count;
+        this.data.decisions_evaluated += count;
     }
     addMatchesFound(count) {
-        this.metrics.matches_found += count;
+        this.data.matches_found += count;
+    }
+    addCriticalMatches(count) {
+        this.data.critical_matches += count;
+    }
+    addWarningMatches(count) {
+        this.data.warning_matches += count;
+    }
+    addInfoMatches(count) {
+        this.data.info_matches += count;
     }
     setDuration(ms) {
-        this.metrics.duration_ms = ms;
+        this.data.duration_ms = ms;
     }
-    report() {
-        core.info('=== Performance Metrics ===');
-        core.info(`API Calls: ${this.metrics.api_calls}`);
-        core.info(`API Errors: ${this.metrics.api_errors}`);
-        core.info(`Rate Limit Hits: ${this.metrics.rate_limit_hits}`);
-        core.info(`Files Processed: ${this.metrics.files_processed}`);
-        core.info(`Decisions Evaluated: ${this.metrics.decisions_evaluated}`);
-        core.info(`Matches Found: ${this.metrics.matches_found}`);
-        core.info(`Duration: ${this.metrics.duration_ms}ms`);
-        core.setOutput('metrics', JSON.stringify(this.metrics));
+    addParseErrors(count) {
+        this.data.parse_errors += count;
+    }
+    addParseWarnings(count) {
+        this.data.parse_warnings += count;
+    }
+    /**
+     * Returns an immutable snapshot of collected metrics.
+     * Callers decide how to output: console, Actions output, telemetry, etc.
+     */
+    getSnapshot() {
+        return { ...this.data };
+    }
+    /**
+     * Reset all metrics to zero (useful for testing)
+     */
+    reset() {
+        this.data = {
+            api_calls: 0,
+            api_errors: 0,
+            rate_limit_hits: 0,
+            files_processed: 0,
+            decisions_evaluated: 0,
+            matches_found: 0,
+            critical_matches: 0,
+            warning_matches: 0,
+            info_matches: 0,
+            duration_ms: 0,
+            parse_errors: 0,
+            parse_warnings: 0,
+        };
     }
 }
 exports.MetricsCollector = MetricsCollector;
+/** Shared singleton instance */
 exports.metrics = new MetricsCollector();
 
 
 /***/ }),
 
-/***/ 7196:
+/***/ 5392:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -39632,7 +39456,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.DecisionParser = void 0;
 const fs = __importStar(__nccwpck_require__(1943));
 const path = __importStar(__nccwpck_require__(6928));
-const rule_parser_1 = __nccwpck_require__(6965);
+const rule_parser_1 = __nccwpck_require__(161);
 class DecisionParser {
     ruleParser = new rule_parser_1.RuleParser();
     STATUS_SYNONYMS = {
@@ -39939,57 +39763,28 @@ exports.DecisionParser = DecisionParser;
 
 /***/ }),
 
-/***/ 9785:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+/***/ 5749:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
 
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.RuleEvaluator = void 0;
 /**
  * Rule Evaluator - Evaluates decision rules against file diffs
  */
-const core = __importStar(__nccwpck_require__(7484));
 const minimatch_1 = __nccwpck_require__(6507);
-const rule_types_1 = __nccwpck_require__(7233);
-const content_matchers_1 = __nccwpck_require__(3632);
+const rule_types_1 = __nccwpck_require__(4829);
+const content_matchers_1 = __nccwpck_require__(4716);
 class RuleEvaluator {
-    contentMatchers = new content_matchers_1.ContentMatchers();
+    contentMatchers;
+    logger;
+    constructor(logger) {
+        this.logger = logger;
+        this.contentMatchers = new content_matchers_1.ContentMatchers(logger);
+    }
     /**
-     * Evaluate if a PR's changes match the decision rules
+     * Evaluate if a changeset matches the decision rules
      */
     async evaluate(rules, fileDiffs, depth = 0) {
         // Depth safety check
@@ -40103,7 +39898,7 @@ class RuleEvaluator {
         }
         catch (error) {
             const message = error instanceof Error ? error.message : String(error);
-            core.warning(`Rule evaluation failed for pattern "${rule.pattern}": ${message}`);
+            this.logger.warning(`Rule evaluation failed for pattern "${rule.pattern}": ${message}`);
             return {
                 matched: false,
                 matchedPatterns: [],
@@ -40156,7 +39951,7 @@ exports.RuleEvaluator = RuleEvaluator;
 
 /***/ }),
 
-/***/ 6965:
+/***/ 161:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -40201,7 +39996,7 @@ exports.RuleParser = void 0;
  */
 const fs = __importStar(__nccwpck_require__(1943));
 const path = __importStar(__nccwpck_require__(6928));
-const rule_types_1 = __nccwpck_require__(7233);
+const rule_types_1 = __nccwpck_require__(4829);
 class RuleParser {
     /**
      * Extract JSON rules from markdown content
@@ -40343,7 +40138,7 @@ exports.RuleParser = RuleParser;
 
 /***/ }),
 
-/***/ 7233:
+/***/ 4829:
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
@@ -40373,7 +40168,7 @@ function isRuleCondition(condition) {
 
 /***/ }),
 
-/***/ 6224:
+/***/ 1599:
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
@@ -40458,6 +40253,283 @@ class PatternTrie {
     }
 }
 exports.PatternTrie = PatternTrie;
+
+
+/***/ }),
+
+/***/ 1730:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const github = __importStar(__nccwpck_require__(3228));
+const path = __importStar(__nccwpck_require__(6928));
+const parser_1 = __nccwpck_require__(5392);
+const matcher_1 = __nccwpck_require__(3005);
+const metrics_1 = __nccwpck_require__(3010);
+const logger_1 = __nccwpck_require__(1227);
+const health_1 = __nccwpck_require__(4365);
+const actions_logger_1 = __nccwpck_require__(5170);
+const github_provider_1 = __nccwpck_require__(125);
+const health_2 = __nccwpck_require__(4958);
+const zod_1 = __nccwpck_require__(924);
+// Create the logger for the entire action lifetime
+const logger = new actions_logger_1.ActionsLogger();
+/**
+ * Main entry point for the GitHub Action
+ */
+async function run() {
+    const startTime = Date.now();
+    const errors = [];
+    try {
+        // 1. Load configuration
+        const config = loadConfig();
+        // 2. Health checks
+        const decisionFileOk = await (0, health_1.checkDecisionFileExists)(config.decisionFile);
+        const tokenOk = await (0, health_2.validateToken)(config.token, logger);
+        if (!decisionFileOk || !tokenOk) {
+            logger.setFailed('System health check failed');
+            return;
+        }
+        logger.info(`Decision file: ${config.decisionFile}`);
+        // 3. Parse decisions
+        logger.startGroup('Parsing decisions...');
+        const parser = new parser_1.DecisionParser();
+        const parseResult = await parser.parseFile(config.decisionFile);
+        if (parseResult.warnings.length > 0) {
+            parseResult.warnings.forEach((warn) => {
+                logger.warning(warn);
+            });
+        }
+        if (parseResult.errors.length > 0) {
+            logger.warning(`Found ${parseResult.errors.length} parse errors`);
+            parseResult.errors.forEach((err) => {
+                logger.warning(`Line ${err.line}: ${err.message}`);
+            });
+            if (config.failOnError) {
+                logger.setFailed(`Decision file has ${parseResult.errors.length} parse errors`);
+                return;
+            }
+        }
+        const hasRules = parseResult.decisions.some((d) => d.rules);
+        logger.info(`Loaded ${parseResult.decisions.length} decisions (${hasRules ? 'with advanced rules' : 'file-based only'})`);
+        logger.endGroup();
+        // 4. Create SCM provider and fetch diffs
+        logger.startGroup('Fetching file diffs...');
+        const provider = new github_provider_1.GitHubProvider(config.token, logger);
+        const changedFiles = await provider.getChangedFiles();
+        const useStreaming = changedFiles.length > 1000;
+        let matches;
+        let processedFileCount = 0;
+        if (useStreaming) {
+            logger.info(`Large PR detected (${changedFiles.length} files), using streaming mode`);
+            logger.endGroup();
+            logger.startGroup('Processing with streaming...');
+            matches = await processWithStreaming(parseResult.decisions, provider);
+            processedFileCount = changedFiles.length;
+            logger.endGroup();
+        }
+        else {
+            const fileDiffs = await provider.getFileDiffs();
+            processedFileCount = fileDiffs.length;
+            metrics_1.metrics.addFilesProcessed(fileDiffs.length);
+            logger.info(`PR modifies ${fileDiffs.length} files`);
+            if (fileDiffs.length === 0) {
+                logger.info('No file diffs found - PR is clear!');
+                logger.setOutput('matches_found', '0');
+                logger.setOutput('critical_count', '0');
+                (0, logger_1.logStructured)(logger, 'info', 'Decision Guardian completed successfully (no files)', {
+                    duration_ms: Date.now() - startTime,
+                });
+                metrics_1.metrics.setDuration(Date.now() - startTime);
+                reportMetrics();
+                return;
+            }
+            logger.endGroup();
+            // 5. Match files to decisions
+            logger.startGroup('Matching decisions...');
+            const matcher = new matcher_1.FileMatcher(parseResult.decisions, logger);
+            try {
+                matches = await matcher.findMatchesWithDiffs(fileDiffs);
+            }
+            catch (error) {
+                logger.warning(`Advanced matching failed, falling back to simple mode: ${error}`);
+                const fileNames = fileDiffs.map((f) => f.filename);
+                matches = await matcher.findMatches(fileNames);
+            }
+        }
+        const matcher = new matcher_1.FileMatcher(parseResult.decisions, logger);
+        const grouped = matcher.groupBySeverity(matches);
+        metrics_1.metrics.addMatchesFound(matches.length);
+        logger.info(`Found ${matches.length} matches:`);
+        logger.info(`  - Critical: ${grouped.critical.length}`);
+        logger.info(`  - Warning: ${grouped.warning.length}`);
+        logger.info(`  - Info: ${grouped.info.length}`);
+        logger.endGroup();
+        // 6. Post comment if matches found
+        if (matches.length > 0) {
+            logger.startGroup('Posting PR comment...');
+            await provider.postComment(matches);
+            logger.endGroup();
+            logger.setOutput('matches_found', String(matches.length));
+            logger.setOutput('critical_count', String(grouped.critical.length));
+            // 7. Fail check if critical decisions violated
+            if (config.failOnCritical && grouped.critical.length > 0) {
+                const failureMessage = `PR modifies ${grouped.critical.length} files protected by critical decisions`;
+                (0, logger_1.logStructured)(logger, 'error', 'Decision Guardian failed checks', {
+                    match_count: matches.length,
+                    critical_count: grouped.critical.length,
+                    duration_ms: Date.now() - startTime,
+                });
+                logger.setFailed(failureMessage);
+                metrics_1.metrics.setDuration(Date.now() - startTime);
+                reportMetrics();
+                return;
+            }
+        }
+        else {
+            logger.info('No decision matches found - PR is clear!');
+            logger.setOutput('matches_found', '0');
+            logger.setOutput('critical_count', '0');
+        }
+        if (config.telemetryEnabled) {
+            logger.info(`Telemetry: Decision Guardian run completed. Matches: ${matches.length}, Critical: ${grouped.critical.length}`);
+        }
+        const duration = Date.now() - startTime;
+        (0, logger_1.logStructured)(logger, 'info', 'Decision Guardian completed successfully', {
+            pr_number: github.context.payload.pull_request?.number,
+            file_count: processedFileCount,
+            decision_count: parseResult.decisions.length,
+            match_count: matches.length,
+            duration_ms: duration,
+        });
+        metrics_1.metrics.setDuration(duration);
+        reportMetrics();
+        logger.info('✅ Decision Guardian completed successfully');
+    }
+    catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        const stack = error instanceof Error ? error.stack : undefined;
+        errors.push(message);
+        (0, logger_1.logStructured)(logger, 'error', 'Decision Guardian failed', {
+            duration_ms: Date.now() - startTime,
+            errors,
+        });
+        logger.setFailed(`Action failed: ${message}`);
+        if (stack) {
+            logger.debug(stack);
+        }
+        metrics_1.metrics.setDuration(Date.now() - startTime);
+        reportMetrics();
+    }
+}
+const ConfigSchema = zod_1.z.object({
+    decisionFile: zod_1.z
+        .string()
+        .regex(/^[a-zA-Z0-9._/-]+$/, 'Invalid characters in decision file path')
+        .refine((val) => !val.includes('..'), 'Path traversal not allowed'),
+    failOnCritical: zod_1.z.boolean(),
+    failOnError: zod_1.z.boolean(),
+    telemetryEnabled: zod_1.z.boolean(),
+    token: zod_1.z.string().min(1, 'Token cannot be empty'),
+});
+/**
+ * Load action configuration from inputs
+ */
+function loadConfig() {
+    const rawConfig = {
+        decisionFile: logger.getInput('decision_file') || '.decispher/decisions.md',
+        failOnCritical: logger.getBooleanInput('fail_on_critical'),
+        failOnError: logger.getBooleanInput('fail_on_error'),
+        telemetryEnabled: logger.getBooleanInput('telemetry_enabled'),
+        token: logger.getInput('token', true),
+    };
+    const result = ConfigSchema.safeParse(rawConfig);
+    if (!result.success) {
+        const errorMessage = result.error.issues
+            .map((e) => `${e.path.join('.')}: ${e.message}`)
+            .join(', ');
+        throw new Error(`Invalid configuration: ${errorMessage}`);
+    }
+    if (path.isAbsolute(result.data.decisionFile)) {
+        throw new Error('decision_file must be a relative path');
+    }
+    const config = result.data;
+    logger.debug(`Configuration loaded: ${JSON.stringify({
+        ...config,
+        token: '***',
+    })}`);
+    return config;
+}
+/**
+ * Report metrics using the decoupled snapshot approach
+ */
+function reportMetrics() {
+    const snapshot = metrics_1.metrics.getSnapshot();
+    logger.info('=== Performance Metrics ===');
+    logger.info(`API Calls: ${snapshot.api_calls}`);
+    logger.info(`API Errors: ${snapshot.api_errors}`);
+    logger.info(`Rate Limit Hits: ${snapshot.rate_limit_hits}`);
+    logger.info(`Files Processed: ${snapshot.files_processed}`);
+    logger.info(`Decisions Evaluated: ${snapshot.decisions_evaluated}`);
+    logger.info(`Matches Found: ${snapshot.matches_found}`);
+    logger.info(`Duration: ${snapshot.duration_ms}ms`);
+    logger.setOutput('metrics', JSON.stringify(snapshot));
+}
+/**
+ * Process large PRs using streaming
+ */
+async function processWithStreaming(decisions, provider) {
+    const matcher = new matcher_1.FileMatcher(decisions, logger);
+    const allMatches = [];
+    let processedCount = 0;
+    if (!provider.streamFileDiffs) {
+        throw new Error('Provider does not support streaming');
+    }
+    for await (const batch of provider.streamFileDiffs()) {
+        const batchMatches = await matcher.findMatchesWithDiffs(batch);
+        allMatches.push(...batchMatches);
+        processedCount += batch.length;
+        logger.info(`Processed ${processedCount} files, found ${allMatches.length} matches so far`);
+    }
+    return allMatches;
+}
+// Run the action
+run();
 
 
 /***/ }),
