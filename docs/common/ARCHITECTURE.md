@@ -6,6 +6,8 @@ Decision Guardian is a platform-agnostic tool for surfacing architectural decisi
 
 ![System Architecture](./images/architecture.png)
 
+See interactive image [here](../mermaid_code.md#system-architecture)
+
 ## Design Principles
 
 1. **Dependency Inversion**: Core engine depends on interfaces (`ILogger`, `ISCMProvider`), not concrete implementations.
@@ -72,9 +74,13 @@ Decision Guardian is a platform-agnostic tool for surfacing architectural decisi
 
 ![Data Flow (GitHub Action)](./images/data_flow_action.png)
 
+(See interactive image [here](../mermaid_code.md#data-flow-github-action))
+
 ### CLI
 
 ![Data Flow (CLI)](./images/data_flow_cli.png)
+
+(See interactive image [here](../mermaid_code.md#data-flow-cli))
 
 ## Build Outputs
 

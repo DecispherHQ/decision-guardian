@@ -5,13 +5,16 @@ Use the following Mermaid code to generate images for your documentation. You ca
 ## 1. System Architecture
 
 ```mermaid
-graph TD
-    subgraph "Entry Points"
+---
+config:
+  layout: elk
+---
+flowchart LR
+ subgraph subGraph0["Entry Points"]
         Main["main.ts (Action)"]
         CLI["src/cli/index.ts (CLI)"]
-    end
-
-    subgraph "Core Engine"
+  end
+ subgraph subGraph1["Core Engine"]
         Parser["src/core/parser.ts"]
         Matcher["src/core/matcher.ts"]
         RuleEval["src/core/rule-evaluator.ts"]
@@ -19,32 +22,19 @@ graph TD
         Trie["src/core/trie.ts"]
         Logger["src/core/logger.ts"]
         Health["src/core/health.ts"]
-    end
-
-    subgraph "Adapters"
+  end
+ subgraph Adapters["Adapters"]
         GH_Adapter["GitHub Adapter"]
         Local_Adapter["Local Adapter"]
-    end
-
-    subgraph "Modules"
+  end
+ subgraph Modules["Modules"]
         Telemetry["Telemetry Module"]
-    end
-
-    Main --> Parser
-    Main --> Matcher
-    Main --> RuleEval
-    CLI --> Parser
-    CLI --> Matcher
-    CLI --> RuleEval
-    Main --> Metrics
-    CLI --> Metrics
-    Main --> GH_Adapter
-    CLI --> Local_Adapter
+  end
+    Main --> Telemetry &  GH_Adapter
+    CLI --> Telemetry & Local_Adapter
+    subGraph0 --> subGraph1
     Metrics --> Telemetry
-    Main --> Telemetry
-    CLI --> Telemetry
 ```
-
 ## 2. Data Flow (GitHub Action)
 
 ```mermaid
@@ -101,23 +91,23 @@ sequenceDiagram
 
 ```mermaid
 flowchart TD
-    Start[Start] --> LoadConfig[Load Configuration]
+    Start["Start"] --> LoadConfig["Load Configuration"]
     LoadConfig --> ValidateConfig{Valid Config?}
-    ValidateConfig -- No --> Error[Exit with Error]
-    ValidateConfig -- Yes --> ParseDecisions[Parse Decisions File]
-    ParseDecisions --> GetDiffs[Get Git Diffs]
-    GetDiffs --> BuildTrie[Build Pattern Trie]
+    ValidateConfig -- No --> Error["Exit with Error"]
+    ValidateConfig -- Yes --> ParseDecisions["Parse Decisions File"]
+    ParseDecisions --> GetDiffs["Get Git Diffs"]
+    GetDiffs --> BuildTrie["Build Pattern Trie"]
     BuildTrie --> LoopFiles{For Each File}
-    LoopFiles -- Done --> GenerateComment[Generate Comment/Output]
+    LoopFiles -- Done --> GenerateComment["Generate Comment/Output"]
     LoopFiles -- Next File --> CheckMatch{Match Trie?}
     CheckMatch -- No --> LoopFiles
     CheckMatch -- Yes --> CheckRules{Advanced Rules?}
-    CheckRules -- No --> AddMatch[Add to Matches]
-    CheckRules -- Yes --> EvalRules[Evaluate Rules]
+    CheckRules -- No --> AddMatch["Add to Matches"]
+    CheckRules -- Yes --> EvalRules["Evaluate Rules"]
     EvalRules -- Fail --> LoopFiles
     EvalRules -- Pass --> AddMatch
     AddMatch --> LoopFiles
     GenerateComment --> CheckSeverity{Critical Violation?}
-    CheckSeverity -- Yes --> Fail[Fail Build (if configured)]
-    CheckSeverity -- No --> Success[Pass Build]
+    CheckSeverity -- Yes --> FailBuild["Fail Build (if configured)"]
+    CheckSeverity -- No --> Success["Pass Build"]
 ```

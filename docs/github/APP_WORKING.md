@@ -19,6 +19,7 @@ Decision Guardian is a GitHub Action that surfaces architectural decisions when 
 
 ![High Level Flow](../common/images/high_level_flow.png)
 
+See interactive image [here](../mermaid_code.md#high-level-flow)
 ---
 
 ## Component Architecture (v1.1)
