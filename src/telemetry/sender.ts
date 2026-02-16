@@ -2,7 +2,7 @@ import { MetricsSnapshot } from '../core/metrics';
 import { buildPayload } from './payload';
 import { validatePrivacy } from './privacy';
 
-const DEFAULT_ENDPOINT = 'https://telemetry.decispher.com/collect';
+const DEFAULT_ENDPOINT = 'https://decision-guardian-telemetry.iamalizaidi110.workers.dev/collect';
 const TIMEOUT_MS = 5000;
 
 function isOptedIn(): boolean {

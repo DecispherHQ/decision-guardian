@@ -45,6 +45,7 @@ const github_provider_1 = require("./adapters/github/github-provider");
 const health_2 = require("./adapters/github/health");
 const zod_1 = require("zod");
 const sender_1 = require("./telemetry/sender");
+const version_1 = require("./version");
 // Create the logger for the entire action lifetime
 const logger = new actions_logger_1.ActionsLogger();
 /**
@@ -247,7 +248,7 @@ function reportMetrics() {
     logger.info(`Matches Found: ${snapshot.matches_found}`);
     logger.info(`Duration: ${snapshot.duration_ms}ms`);
     logger.setOutput('metrics', JSON.stringify(snapshot));
-    (0, sender_1.sendTelemetry)('action', snapshot, '1.0.0').catch(() => { });
+    (0, sender_1.sendTelemetry)('action', snapshot, version_1.VERSION).catch(() => { });
 }
 /**
  * Process large PRs using streaming

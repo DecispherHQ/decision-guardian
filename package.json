@@ -1,6 +1,6 @@
 {
   "name": "decision-guardian",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Surface architectural decision context on Pull Requests",
   "main": "dist/index.js",
   "bin": {

@@ -43,6 +43,7 @@ const local_git_provider_1 = require("../../adapters/local/local-git-provider");
 const metrics_1 = require("../../core/metrics");
 const formatter_1 = require("../formatter");
 const sender_1 = require("../../telemetry/sender");
+const version_1 = require("../../version");
 async function runCheck(opts) {
     const logger = new console_logger_1.ConsoleLogger();
     const startTime = Date.now();
@@ -111,7 +112,7 @@ async function runCheck(opts) {
             info: grouped.info.length,
             durationMs: snapshot.duration_ms,
         }));
-        (0, sender_1.sendTelemetry)('cli', snapshot, '1.0.0').catch(() => { });
+        (0, sender_1.sendTelemetry)('cli', snapshot, version_1.VERSION).catch(() => { });
         if (opts.failOnCritical && grouped.critical.length > 0) {
             logger.error(`${grouped.critical.length} critical violations found`);
             process.exit(1);

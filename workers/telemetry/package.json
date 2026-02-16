@@ -1,0 +1,13 @@
+{
+    "name": "decision-guardian-telemetry",
+    "version": "1.0.0",
+    "private": true,
+    "scripts": {
+        "dev": "wrangler dev",
+        "deploy": "wrangler deploy"
+    },
+    "devDependencies": {
+        "@cloudflare/workers-types": "^4.20240129.0",
+        "wrangler": "^3.0.0"
+    }
+}

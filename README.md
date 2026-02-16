@@ -175,6 +175,7 @@ When someone opens a PR modifying `src/db/pool.ts`, Decision Guardian automatica
 | `decision_file` | `.decispher/decisions.md` | Path to file or directory |
 | `fail_on_critical` | `false` | Fail PR check on critical violations |
 | `fail_on_error` | `false` | Fail on parse errors |
+| `telemetry_enabled` | `true` | Send anonymous usage metrics ([Privacy Policy](PRIVACY.md)) |
 | `token` | `${{ github.token }}` | GitHub token (required) |
 
 ### Outputs
