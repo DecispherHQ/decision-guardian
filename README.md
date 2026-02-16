@@ -144,6 +144,17 @@ When someone opens a PR modifying `src/db/pool.ts`, Decision Guardian automatica
 - Self-healing duplicate cleanup
 - Progressive truncation for large PRs
 
+✅ **Local CLI** ([docs](docs/CLI.md))
+- Run checks locally without GitHub Actions
+- Works with any CI system (GitLab, Jenkins, etc.)
+- Templates for quick setup
+- Single-file bundle (~430KB)
+
+✅ **Opt-in Telemetry** ([docs](docs/TELEMETRY.md))
+- Privacy-first: no source code, no identifiers
+- Blocklist-enforced payload validation
+- Fire-and-forget, never blocks the tool
+
 ---
 
 ## Configuration
@@ -580,10 +591,29 @@ npm install
 
 ```bash
 npm run build      # Compile TypeScript
-npm run package    # Bundle for distribution
-npm test           # Run tests
+npm run bundle     # Bundle Action for distribution
+npm run build:cli  # Bundle CLI (~430KB)
+npm test           # Run tests (109 tests)
 npm run lint       # Check code quality
 ```
+
+### CLI Development
+
+```bash
+# Run CLI from source
+npx ts-node src/cli/index.ts check .decispher/decisions.md
+
+# Build and test CLI bundle
+npm run build:cli
+node dist/cli/index.js --help
+```
+
+### Documentation
+
+- [CLI Usage](docs/CLI.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Templates](docs/TEMPLATES.md)
+- [Telemetry](docs/TELEMETRY.md)
 
 
 ---
