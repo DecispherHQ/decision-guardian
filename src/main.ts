@@ -10,6 +10,7 @@ import { ActionsLogger } from './adapters/github/actions-logger';
 import { GitHubProvider } from './adapters/github/github-provider';
 import { validateToken } from './adapters/github/health';
 import { z } from 'zod';
+import { sendTelemetry } from './telemetry/sender';
 
 // Create the logger for the entire action lifetime
 const logger = new ActionsLogger();
@@ -260,6 +261,8 @@ function reportMetrics(): void {
   logger.info(`Duration: ${snapshot.duration_ms}ms`);
 
   logger.setOutput('metrics', JSON.stringify(snapshot));
+
+  sendTelemetry('action', snapshot, '1.0.0').catch(() => { });
 }
 
 /**

@@ -6,6 +6,7 @@ import { ConsoleLogger } from '../../adapters/local/console-logger';
 import { LocalGitProvider, LocalGitConfig } from '../../adapters/local/local-git-provider';
 import { metrics } from '../../core/metrics';
 import { formatMatchesTable, formatSummary } from '../formatter';
+import { sendTelemetry } from '../../telemetry/sender';
 
 export interface CheckOptions {
     decisionFile: string;
@@ -97,6 +98,8 @@ export async function runCheck(opts: CheckOptions): Promise<void> {
             info: grouped.info.length,
             durationMs: snapshot.duration_ms,
         }));
+
+        sendTelemetry('cli', snapshot, '1.0.0').catch(() => { });
 
         if (opts.failOnCritical && grouped.critical.length > 0) {
             logger.error(`${grouped.critical.length} critical violations found`);
