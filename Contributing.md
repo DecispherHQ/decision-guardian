@@ -706,7 +706,7 @@ Based on the codebase, ensure tests cover:
    - Full file mode
    - JSON path mode
 
-5. **GitHub Utils** (`github-utils.test.ts`)
+5. **GitHub Provider** (`error-scenarios.test.ts`)
    - Rate limit handling
    - Pagination
    - Circuit breaker pattern

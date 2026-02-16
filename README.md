@@ -175,6 +175,7 @@ When someone opens a PR modifying `src/db/pool.ts`, Decision Guardian automatica
 | `decision_file` | `.decispher/decisions.md` | Path to file or directory |
 | `fail_on_critical` | `false` | Fail PR check on critical violations |
 | `fail_on_error` | `false` | Fail on parse errors |
+| `telemetry_enabled` | `true` | Send anonymous usage metrics ([Privacy Policy](PRIVACY.md)) |
 | `token` | `${{ github.token }}` | GitHub token (required) |
 
 ### Outputs
@@ -442,10 +443,10 @@ PR Created → Parse Decisions → Match Files → Post Comment → Check Status
 ```
 
 **Key components:**
-- **Parser** (`parser.ts`): Markdown → structured data
-- **Matcher** (`matcher.ts`): Trie-based file matching
-- **Rule Evaluator** (`rule-evaluator.ts`): Advanced rules
-- **Comment Manager** (`comment.ts`): Idempotent PR comments
+- **Parser** (`src/core/parser.ts`): Markdown → structured data
+- **Matcher** (`src/core/matcher.ts`): Trie-based file matching
+- **Rule Evaluator** (`src/core/rule-evaluator.ts`): Advanced rules
+- **Comment Manager** (`src/adapters/github/comment.ts`): Idempotent PR comments
 
 
 ### Key Optimizations

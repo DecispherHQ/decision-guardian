@@ -1,0 +1,179 @@
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.RuleParser = void 0;
+/**
+ * Rule Parser - Extracts JSON rules from markdown decision blocks
+ */
+const fs = __importStar(require("fs/promises"));
+const path = __importStar(require("path"));
+const rule_types_1 = require("./rule-types");
+class RuleParser {
+    /**
+     * Extract JSON rules from markdown content
+     * Supports:
+     * 1. Inline JSON: **Rules**: followed by ```json ... ```
+     * 2. External File: **Rules**: [Link](./path) or just path
+     */
+    async extractRules(content, sourceFilePath) {
+        // 1. Try inline JSON first
+        const rulesMatch = content.match(/\*\*Rules\*\*:\s*```json\s+([\s\S]+?)\s+```/i);
+        if (rulesMatch) {
+            try {
+                const parsed = JSON.parse(rulesMatch[1]);
+                const validated = this.validate(parsed, 0);
+                return { rules: validated };
+            }
+            catch (error) {
+                const message = error instanceof Error ? error.message : String(error);
+                return {
+                    rules: null,
+                    error: `Failed to parse inline JSON rules: ${message}`,
+                };
+            }
+        }
+        // 2. Try external file reference
+        // Matches: **Rules**: [Label](path) or **Rules**: path/to/file.json
+        const linkMatch = content.match(/\*\*Rules\*\*:\s*(?:\[.*?\]\((.*?)\)|(\S+\.json))/i);
+        if (linkMatch) {
+            const relPath = linkMatch[1] || linkMatch[2];
+            try {
+                const workspaceRoot = process.env.GITHUB_WORKSPACE || process.cwd();
+                const sourceDir = path.dirname(sourceFilePath);
+                // Resolve path relative to the decision file
+                const resolvedPath = path.resolve(sourceDir, relPath);
+                const normalizedWorkspace = path.normalize(workspaceRoot);
+                if (!resolvedPath.startsWith(normalizedWorkspace) &&
+                    !resolvedPath.includes('node_modules')) {
+                    // Path is outside workspace - future enhancement: add security warning
+                }
+                const fileContent = await fs.readFile(resolvedPath, 'utf-8');
+                const parsed = JSON.parse(fileContent);
+                const validated = this.validate(parsed, 0);
+                return { rules: validated };
+            }
+            catch (error) {
+                const message = error instanceof Error ? error.message : String(error);
+                return {
+                    rules: null,
+                    error: `Failed to load external rules from ${relPath}: ${message}`,
+                };
+            }
+        }
+        return { rules: null };
+    }
+    /**
+     * Validate rule structure with depth tracking
+     */
+    validate(rules, depth) {
+        if (depth > rule_types_1.MAX_RULE_DEPTH) {
+            throw new Error(`Rule nesting exceeds max depth of ${rule_types_1.MAX_RULE_DEPTH}`);
+        }
+        if (!rules.match_mode) {
+            rules.match_mode = 'any';
+        }
+        if (rules.pattern && !rules.conditions) {
+            this.validateFileRule(rules);
+            return rules;
+        }
+        if (rules.conditions && Array.isArray(rules.conditions)) {
+            for (const condition of rules.conditions) {
+                if ((0, rule_types_1.isFileRule)(condition)) {
+                    this.validateFileRule(condition);
+                }
+                else {
+                    this.validate(condition, depth + 1);
+                }
+            }
+        }
+        return rules;
+    }
+    /**
+     * Validate a file rule
+     */
+    validateFileRule(rule) {
+        if (!rule.pattern) {
+            throw new Error('FileRule must have a pattern');
+        }
+        if (rule.content_rules && Array.isArray(rule.content_rules)) {
+            for (const contentRule of rule.content_rules) {
+                this.validateContentRule(contentRule);
+            }
+        }
+    }
+    /**
+     * Validate a content rule
+     */
+    validateContentRule(rule) {
+        const validModes = ['string', 'regex', 'line_range', 'full_file', 'json_path'];
+        if (!validModes.includes(rule.mode)) {
+            throw new Error(`Invalid content rule mode: ${rule.mode}`);
+        }
+        switch (rule.mode) {
+            case 'string':
+                if (!rule.patterns || !Array.isArray(rule.patterns)) {
+                    throw new Error('String mode requires patterns array');
+                }
+                break;
+            case 'regex':
+                if (!rule.pattern) {
+                    throw new Error('Regex mode requires pattern');
+                }
+                try {
+                    new RegExp(rule.pattern, rule.flags || '');
+                }
+                catch (e) {
+                    throw new Error(`Invalid regex pattern: ${rule.pattern}`);
+                }
+                break;
+            case 'line_range':
+                if (typeof rule.start !== 'number' || typeof rule.end !== 'number') {
+                    throw new Error('Line range mode requires start and end numbers');
+                }
+                if (rule.start > rule.end) {
+                    throw new Error('Line range start must be <= end');
+                }
+                break;
+            case 'json_path':
+                if (!rule.paths || !Array.isArray(rule.paths)) {
+                    throw new Error('JSON path mode requires paths array');
+                }
+                break;
+            case 'full_file':
+                break;
+        }
+    }
+}
+exports.RuleParser = RuleParser;

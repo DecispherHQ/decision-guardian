@@ -40308,6 +40308,7 @@ const github_provider_1 = __nccwpck_require__(125);
 const health_2 = __nccwpck_require__(4958);
 const zod_1 = __nccwpck_require__(924);
 const sender_1 = __nccwpck_require__(4894);
+const version_1 = __nccwpck_require__(311);
 // Create the logger for the entire action lifetime
 const logger = new actions_logger_1.ActionsLogger();
 /**
@@ -40510,7 +40511,7 @@ function reportMetrics() {
     logger.info(`Matches Found: ${snapshot.matches_found}`);
     logger.info(`Duration: ${snapshot.duration_ms}ms`);
     logger.setOutput('metrics', JSON.stringify(snapshot));
-    (0, sender_1.sendTelemetry)('action', snapshot, '1.0.0').catch(() => { });
+    (0, sender_1.sendTelemetry)('action', snapshot, version_1.VERSION).catch(() => { });
 }
 /**
  * Process large PRs using streaming
@@ -40623,7 +40624,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.sendTelemetry = sendTelemetry;
 const payload_1 = __nccwpck_require__(9721);
 const privacy_1 = __nccwpck_require__(2755);
-const DEFAULT_ENDPOINT = 'https://telemetry.decispher.com/collect';
+const DEFAULT_ENDPOINT = 'https://decision-guardian-telemetry.iamalizaidi110.workers.dev/collect';
 const TIMEOUT_MS = 5000;
 function isOptedIn() {
     if (process.env.DG_TELEMETRY === '0' || process.env.DG_TELEMETRY === 'false') {
@@ -40654,6 +40655,21 @@ async function sendTelemetry(source, snapshot, version) {
         // Silently fail — never break the tool
     }
 }
+
+
+/***/ }),
+
+/***/ 311:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.VERSION = void 0;
+/**
+ * Version information for Decision Guardian
+ */
+exports.VERSION = '1.1.0';
 
 
 /***/ }),

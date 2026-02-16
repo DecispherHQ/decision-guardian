@@ -7,8 +7,20 @@ interface TelemetryEvent {
     version: string;
     source: string;
     timestamp: string;
-    metrics: Record<string, number>;
-    environment: Record<string, unknown>;
+    metrics: {
+        files_processed: number;
+        decisions_evaluated: number;
+        matches_found: number;
+        critical_matches: number;
+        warning_matches: number;
+        info_matches: number;
+        duration_ms: number;
+    };
+    environment: {
+        node_version: string;
+        os_platform: string;
+        ci: boolean;
+    };
 }
 
 export default {
