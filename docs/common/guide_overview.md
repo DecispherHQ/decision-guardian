@@ -725,7 +725,7 @@ fail_on_error: true  # Strict mode
 #### `telemetry_enabled`
 
 **Type**: `boolean`  
-**Default**: `false`  
+**Default**: `true`  
 **Required**: No
 
 Enable anonymous usage telemetry.

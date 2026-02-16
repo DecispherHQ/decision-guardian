@@ -1826,7 +1826,7 @@ When `false`: Warnings are logged but the action continues.
 #### `telemetry_enabled`
 
 **Type**: Boolean  
-**Default**: `false`  
+**Default**: `true`  
 **Required**: No
 
 Enable telemetry logging to console (for future analytics features).

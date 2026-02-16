@@ -23,9 +23,9 @@ inputs:
     default: 'false'
     
   telemetry_enabled:
-    description: 'Enable optional telemetry to help improve Decision Guardian'
+    description: 'Enable telemetry to help improve Decision Guardian (opt-out by setting to false)'
     required: false
-    default: 'false'
+    default: 'true'
   
   token:
     description: 'GitHub token for API access (use secrets.GITHUB_TOKEN)'

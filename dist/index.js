@@ -38928,7 +38928,10 @@ class ContentMatchers {
         const matchedPatterns = [];
         for (const path of rule.paths || []) {
             const key = path.split('.').pop() || path;
-            if (changedLines.includes(key)) {
+            // still heuristic but avoids matching random string occurrences
+            const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const keyRegex = new RegExp(`"${escapedKey}"\\s*:`);
+            if (keyRegex.test(changedLines)) {
                 matchedPatterns.push(path);
             }
         }
@@ -39626,7 +39629,7 @@ class DecisionParser {
             const blockContent = content.substring(start, end);
             blocks.push({
                 raw: blockContent,
-                lineNumber: this.computeLineStart(content, blockContent),
+                lineNumber: this.computeLineStart(content, start),
             });
         }
         return blocks;
@@ -39634,11 +39637,8 @@ class DecisionParser {
     /**
      * Compute the line number where a block starts
      */
-    computeLineStart(fullContent, blockContent) {
-        const index = fullContent.indexOf(blockContent);
-        if (index === -1)
-            return 1;
-        const before = fullContent.substring(0, index);
+    computeLineStart(fullContent, startIndex) {
+        const before = fullContent.substring(0, startIndex);
         return before.split(/\r?\n/).length;
     }
     /**
@@ -40317,9 +40317,10 @@ const logger = new actions_logger_1.ActionsLogger();
 async function run() {
     const startTime = Date.now();
     const errors = [];
+    let config;
     try {
         // 1. Load configuration
-        const config = loadConfig();
+        config = loadConfig();
         // 2. Health checks
         const decisionFileOk = await (0, health_1.checkDecisionFileExists)(config.decisionFile);
         const tokenOk = await (0, health_2.validateToken)(config.token, logger);
@@ -40378,7 +40379,7 @@ async function run() {
                     duration_ms: Date.now() - startTime,
                 });
                 metrics_1.metrics.setDuration(Date.now() - startTime);
-                reportMetrics();
+                reportMetrics(config);
                 return;
             }
             logger.endGroup();
@@ -40419,7 +40420,7 @@ async function run() {
                 });
                 logger.setFailed(failureMessage);
                 metrics_1.metrics.setDuration(Date.now() - startTime);
-                reportMetrics();
+                reportMetrics(config);
                 return;
             }
         }
@@ -40427,9 +40428,6 @@ async function run() {
             logger.info('No decision matches found - PR is clear!');
             logger.setOutput('matches_found', '0');
             logger.setOutput('critical_count', '0');
-        }
-        if (config.telemetryEnabled) {
-            logger.info(`Telemetry: Decision Guardian run completed. Matches: ${matches.length}, Critical: ${grouped.critical.length}`);
         }
         const duration = Date.now() - startTime;
         (0, logger_1.logStructured)(logger, 'info', 'Decision Guardian completed successfully', {
@@ -40440,7 +40438,7 @@ async function run() {
             duration_ms: duration,
         });
         metrics_1.metrics.setDuration(duration);
-        reportMetrics();
+        reportMetrics(config);
         logger.info('✅ Decision Guardian completed successfully');
     }
     catch (error) {
@@ -40456,7 +40454,10 @@ async function run() {
             logger.debug(stack);
         }
         metrics_1.metrics.setDuration(Date.now() - startTime);
-        reportMetrics();
+        // Send telemetry only if config was loaded successfully
+        if (config) {
+            reportMetrics(config);
+        }
     }
 }
 const ConfigSchema = zod_1.z.object({
@@ -40500,7 +40501,7 @@ function loadConfig() {
 /**
  * Report metrics using the decoupled snapshot approach
  */
-function reportMetrics() {
+function reportMetrics(config) {
     const snapshot = metrics_1.metrics.getSnapshot();
     logger.info('=== Performance Metrics ===');
     logger.info(`API Calls: ${snapshot.api_calls}`);
@@ -40511,7 +40512,10 @@ function reportMetrics() {
     logger.info(`Matches Found: ${snapshot.matches_found}`);
     logger.info(`Duration: ${snapshot.duration_ms}ms`);
     logger.setOutput('metrics', JSON.stringify(snapshot));
-    (0, sender_1.sendTelemetry)('action', snapshot, version_1.VERSION).catch(() => { });
+    // Send telemetry only if enabled (GitHub Action control)
+    if (config.telemetryEnabled) {
+        (0, sender_1.sendTelemetry)('action', snapshot, version_1.VERSION).catch(() => { });
+    }
 }
 /**
  * Process large PRs using streaming
@@ -40602,7 +40606,7 @@ function findBlockedKeys(obj, prefix = '') {
     const violations = [];
     for (const key of Object.keys(obj)) {
         const fullKey = prefix ? `${prefix}.${key}` : key;
-        if (BLOCKED_FIELDS.has(key)) {
+        if (BLOCKED_FIELDS.has(key.toLowerCase())) {
             violations.push(fullKey);
         }
         if (obj[key] && typeof obj[key] === 'object' && !Array.isArray(obj[key])) {

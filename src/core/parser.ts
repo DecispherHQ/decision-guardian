@@ -197,7 +197,7 @@ export class DecisionParser {
 
             blocks.push({
                 raw: blockContent,
-                lineNumber: this.computeLineStart(content, blockContent),
+                lineNumber: this.computeLineStart(content, start),
             });
         }
 
@@ -207,11 +207,8 @@ export class DecisionParser {
     /**
      * Compute the line number where a block starts
      */
-    private computeLineStart(fullContent: string, blockContent: string): number {
-        const index = fullContent.indexOf(blockContent);
-        if (index === -1) return 1;
-
-        const before = fullContent.substring(0, index);
+    private computeLineStart(fullContent: string, startIndex: number): number {
+        const before = fullContent.substring(0, startIndex);
         return before.split(/\r?\n/).length;
     }
 

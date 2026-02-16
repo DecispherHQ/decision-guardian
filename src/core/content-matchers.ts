@@ -177,7 +177,11 @@ export class ContentMatchers {
 
         for (const path of rule.paths || []) {
             const key = path.split('.').pop() || path;
-            if (changedLines.includes(key)) {
+            // still heuristic but avoids matching random string occurrences
+            const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const keyRegex = new RegExp(`"${escapedKey}"\\s*:`);
+
+            if (keyRegex.test(changedLines)) {
                 matchedPatterns.push(path);
             }
         }

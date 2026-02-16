@@ -116,7 +116,7 @@
 
 ## Upcoming Features
 
-### Version 1.1 (Planned)
+### Version 1.1 (Shipped)
 
 #### 🆕 Decision Templates
 ```markdown

@@ -82,7 +82,7 @@ common patterns like `password = "hunter2"` or `API_KEY = 'abc123'`.
       "content_rules": [
         {
           "mode": "json_path",
-          "path": "dependencies"
+          "paths": ["dependencies"]
         }
       ]
     }

@@ -32,7 +32,7 @@ function findBlockedKeys(
     for (const key of Object.keys(obj)) {
         const fullKey = prefix ? `${prefix}.${key}` : key;
 
-        if (BLOCKED_FIELDS.has(key)) {
+        if (BLOCKED_FIELDS.has(key.toLowerCase())) {
             violations.push(fullKey);
         }
 

@@ -22,10 +22,11 @@ const logger = new ActionsLogger();
 async function run(): Promise<void> {
   const startTime = Date.now();
   const errors: string[] = [];
+  let config: ActionConfig | undefined;
 
   try {
     // 1. Load configuration
-    const config = loadConfig();
+    config = loadConfig();
 
     // 2. Health checks
     const decisionFileOk = await checkDecisionFileExists(config.decisionFile);
@@ -100,7 +101,7 @@ async function run(): Promise<void> {
           duration_ms: Date.now() - startTime,
         });
         metrics.setDuration(Date.now() - startTime);
-        reportMetrics();
+        reportMetrics(config);
         return;
       }
 
@@ -149,19 +150,13 @@ async function run(): Promise<void> {
         });
         logger.setFailed(failureMessage);
         metrics.setDuration(Date.now() - startTime);
-        reportMetrics();
+        reportMetrics(config);
         return;
       }
     } else {
       logger.info('No decision matches found - PR is clear!');
       logger.setOutput('matches_found', '0');
       logger.setOutput('critical_count', '0');
-    }
-
-    if (config.telemetryEnabled) {
-      logger.info(
-        `Telemetry: Decision Guardian run completed. Matches: ${matches.length}, Critical: ${grouped.critical.length}`,
-      );
     }
 
     const duration = Date.now() - startTime;
@@ -174,7 +169,7 @@ async function run(): Promise<void> {
     });
 
     metrics.setDuration(duration);
-    reportMetrics();
+    reportMetrics(config);
 
     logger.info('✅ Decision Guardian completed successfully');
   } catch (error: unknown) {
@@ -194,7 +189,10 @@ async function run(): Promise<void> {
     }
 
     metrics.setDuration(Date.now() - startTime);
-    reportMetrics();
+    // Send telemetry only if config was loaded successfully
+    if (config) {
+      reportMetrics(config);
+    }
   }
 }
 
@@ -249,7 +247,7 @@ function loadConfig(): ActionConfig {
 /**
  * Report metrics using the decoupled snapshot approach
  */
-function reportMetrics(): void {
+function reportMetrics(config: ActionConfig): void {
   const snapshot = metrics.getSnapshot();
 
   logger.info('=== Performance Metrics ===');
@@ -263,7 +261,10 @@ function reportMetrics(): void {
 
   logger.setOutput('metrics', JSON.stringify(snapshot));
 
-  sendTelemetry('action', snapshot, VERSION).catch(() => { });
+  // Send telemetry only if enabled (GitHub Action control)
+  if (config.telemetryEnabled) {
+    sendTelemetry('action', snapshot, VERSION).catch(() => { });
+  }
 }
 
 /**

@@ -1,10 +1,9 @@
 # Telemetry
 
-Decision Guardian includes an **opt-in** telemetry system to help us understand usage patterns and improve the tool.
+Decision Guardian includes a telemetry system to help us understand usage patterns and improve the tool.
 
 ## Privacy First
 
-- **Opt-in only**: Telemetry is disabled by default. You must explicitly enable it.
 - **No source code**: We never collect file contents, diff bodies, or decision text.
 - **No identifiers**: No repo names, org names, usernames, emails, or commit messages.
 - **Aggregated only**: Data is aggregated per-day on the server. Individual events are not stored.
@@ -17,7 +16,7 @@ The privacy module enforces a blocklist. Any payload containing these fields is 
 
 ## What We Collect
 
-When opted in, we collect only:
+When enabled, we collect only:
 
 | Field | Example | Purpose |
 |-------|---------|---------|
@@ -33,27 +32,36 @@ When opted in, we collect only:
 | `os_platform` | `linux` | Platform support |
 | `ci` | `true` | CI vs local usage |
 
-## Enabling Telemetry
+## Telemetry Control
 
-### GitHub Action
+### GitHub Action (Opt-Out, Default: Enabled)
+
+Telemetry is **enabled by default** for GitHub Actions. To disable:
 
 ```yaml
 - uses: DecispherHQ/decision-guardian@v1
   with:
     token: ${{ secrets.GITHUB_TOKEN }}
-  env:
-    DG_TELEMETRY: '1'
+    telemetry_enabled: false  # Disable telemetry
 ```
 
-### CLI
+### CLI (Opt-In, Default: Disabled)
+
+Telemetry is **disabled by default** for CLI. To enable:
 
 ```bash
 DG_TELEMETRY=1 decision-guardian check .decispher/decisions.md
 ```
 
+To explicitly disable (though it's already disabled by default):
+
+```bash
+DG_TELEMETRY=0 decision-guardian check .decispher/decisions.md
+```
+
 ### Custom Endpoint
 
-For self-hosted telemetry:
+For self-hosted telemetry (CLI only):
 
 ```bash
 DG_TELEMETRY=1 DG_TELEMETRY_URL=https://your-server.com/collect decision-guardian check ...
@@ -74,13 +82,3 @@ Client (Action/CLI)           Cloudflare Worker           KV Store
 - **Fire-and-forget**: Telemetry never blocks or slows down the main tool.
 - **5-second timeout**: If the endpoint is unreachable, the request silently fails.
 - **90-day retention**: Aggregated data expires after 90 days.
-
-## Disabling Telemetry
-
-Telemetry is off by default. To explicitly disable:
-
-```bash
-DG_TELEMETRY=0 decision-guardian check ...
-```
-
-Or simply don't set `DG_TELEMETRY` at all.
