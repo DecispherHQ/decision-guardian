@@ -13,7 +13,7 @@ Decision Guardian is a GitHub Action that automatically surfaces architectural d
 **Created by [Ali Abbas](https://github.com/gr8-alizaidi) • Part of the [Decispher](https://decispher.com) project**
 
 <div align="center">
-  <img src="documentation/demo.gif" alt="Decision Guardian Demo" width="100%">
+  <img src="docs/common/images/demo.gif" alt="Decision Guardian Demo" width="100%">
 </div>
 
 ---
@@ -611,10 +611,10 @@ node dist/cli/index.js --help
 
 ### Documentation
 
-- [CLI Usage](docs/CLI.md)
-- [Architecture](docs/ARCHITECTURE.md)
-- [Templates](docs/TEMPLATES.md)
-- [Telemetry](docs/TELEMETRY.md)
+- [CLI Usage](docs/cli/CLI.md)
+- [Architecture](docs/common/ARCHITECTURE.md)
+- [Templates](docs/common/TEMPLATES.md)
+- [Telemetry](docs/common/TELEMETRY.md)
 
 
 ---

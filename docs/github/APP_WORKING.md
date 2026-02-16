@@ -17,46 +17,7 @@ Decision Guardian is a GitHub Action that surfaces architectural decisions when 
 
 ### High-Level Flow
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│                    DECISION GUARDIAN                          │
-├──────────────────────────────────────────────────────────────┤
-│                                                               │
-│  1. PR Created/Updated                                        │
-│     └─► GitHub triggers workflow                             │
-│                                                               │
-│  2. Configuration Loading                                     │
-│     ├─► Load action inputs (validated with Zod)              │
-│     └─► Verify GitHub token + permissions                    │
-│                                                               │
-│  3. Decision Parsing                                          │
-│     ├─► Single file: Parse .decispher/decisions.md           │
-│     └─► Directory: Recursive scan for all .md files          │
-│                                                               │
-│  4. File Diff Retrieval                                       │
-│     ├─► Fetch changed files via GitHub API                   │
-│     ├─► Handle pagination (100 files/page, max 3000)         │
-│     └─► Stream processing for 1000+ files                    │
-│                                                               │
-│  5. Decision Matching                                         │
-│     ├─► Trie-based candidate filtering (O(log n))            │
-│     ├─► Glob pattern matching (minimatch)                    │
-│     ├─► Advanced rule evaluation (if defined)                │
-│     └─► Content diff analysis (regex, string, line_range)    │
-│                                                               │
-│  6. Comment Management                                        │
-│     ├─► Find existing bot comment                            │
-│     ├─► Generate content hash                                │
-│     ├─► Update if changed, skip if identical                 │
-│     └─► Retry on conflict (3 attempts)                       │
-│                                                               │
-│  7. Status Check                                              │
-│     ├─► Pass ✅ if no critical violations                     │
-│     ├─► Fail ❌ if critical + fail_on_critical enabled       │
-│     └─► Output metrics for observability                     │
-│                                                               │
-└──────────────────────────────────────────────────────────────┘
-```
+![High Level Flow](../common/images/high_level_flow.png)
 
 ---
 

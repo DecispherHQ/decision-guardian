@@ -4,30 +4,7 @@
 
 Decision Guardian is a platform-agnostic tool for surfacing architectural decisions on code changes. It runs as both a GitHub Action and a standalone CLI.
 
-```
-┌───────────────────────────────────────────────────┐
-│                  Entry Points                     │
-│  ┌─────────────┐         ┌─────────────────────┐  │
-│  │  main.ts    │         │  src/cli/index.ts   │  │
-│  │  (Action)   │         │  (CLI)              |  │
-│  └──────┬──────┘         └──────────┬──────────┘  │
-├─────────┼───────────────────────────┼──────────────┤
-│         ▼                           ▼             │
-│  ┌────────────────────────────────────────────┐   │
-│  │              Core Engine                   │   │
-│  │  parser.ts   matcher.ts   rule-evaluator   │   │
-│  │  metrics.ts  trie.ts      logger.ts        │   │
-│  │  types.ts    health.ts                     │   │
-│  └───────────────────┬────────────────────────┘   │
-│                      │                            │
-│         ┌────────────┼────────────┐               │
-│         ▼            ▼            ▼               │
-│  ┌───────────┐ ┌───────────┐ ┌─────────────┐      │
-│  │  GitHub   │ │  Local    │ │  Telemetry  │      │
-│  │  Adapter  │ │  Adapter  │ │  Module     │      │
-│  └───────────┘ └───────────┘ └─────────────┘      │
-└───────────────────────────────────────────────────┘
-```
+![System Architecture](./images/architecture.png)
 
 ## Design Principles
 
@@ -93,25 +70,11 @@ Decision Guardian is a platform-agnostic tool for surfacing architectural decisi
 
 ### GitHub Action
 
-```
-PR Event → main.ts → loadConfig() → checkDecisionFileExists()
-  → DecisionParser.parseFile()
-  → GitHubProvider.getFileDiffs()
-  → FileMatcher.findMatchesWithDiffs()
-  → GitHubProvider.postComment()
-  → reportMetrics() → sendTelemetry()
-```
+![Data Flow (GitHub Action)](./images/data_flow_action.png)
 
 ### CLI
 
-```
-User runs `check` → parseArgs → runCheck()
-  → DecisionParser.parseFile()
-  → LocalGitProvider.getFileDiffs()
-  → FileMatcher.findMatchesWithDiffs()
-  → formatMatchesTable() + formatSummary()
-  → sendTelemetry() → process.exit()
-```
+![Data Flow (CLI)](./images/data_flow_cli.png)
 
 ## Build Outputs
 
