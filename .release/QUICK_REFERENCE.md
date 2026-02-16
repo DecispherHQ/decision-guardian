@@ -8,16 +8,16 @@
 
 ### Created (10 new documentation files)
 ```
-CHANGELOG.md                          # Main changelog
-docs/CLI.md                           # CLI reference
-docs/ARCHITECTURE.md                  # SOLID design
-docs/TELEMETRY.md                     # Privacy policy
-docs/TEMPLATES.md                     # Template catalog
-workers/telemetry/README.md           # Worker setup
-.release/RELEASE_NOTES_v1.1.md       # Internal notes
-.release/DOCUMENTATION_REVIEW.md      # Doc audit
-.release/SUMMARY.md                   # This summary
-.release/QUICK_REFERENCE.md           # This file
+CHANGELOG.md                                 # Main changelog
+docs/cli/CLI.md                              # CLI reference
+docs/common/ARCHITECTURE.md                  # SOLID design
+docs/common/TELEMETRY.md                     # Privacy policy
+docs/common/TEMPLATES.md                     # Template catalog
+workers/telemetry/README.md                  # Worker setup
+.release/RELEASE_NOTES_v1.1.md               # Internal notes
+.release/DOCUMENTATION_REVIEW.md             # Doc audit
+.release/SUMMARY.md                          # This summary
+.release/QUICK_REFERENCE.md                  # This file
 ```
 
 ### Updated (6 files)
@@ -26,8 +26,8 @@ package.json                          # Version: 1.0.0 → 1.1.0
 README.md                             # Added CLI, templates, demo GIF
 Contributing.md                       # Updated structure, 109 tests
 SECURITY.md                           # Added telemetry section
-documentation/FEATURES_ROADMAP.md     # v1.1 marked shipped
-documentation/APP_WORKING.md          # v1.1 architecture
+docs/common/FEATURES_ROADMAP.md     # v1.1 marked shipped
+docs/common/APP_WORKING.md          # v1.1 architecture
 ```
 
 ---
@@ -101,12 +101,12 @@ git push origin v1.1.0
 ### For End Users
 1. **CHANGELOG.md** - What changed, migration guide
 2. **README.md** - Quick start, features, examples
-3. **docs/CLI.md** - CLI command reference
-4. **docs/TEMPLATES.md** - Template catalog
+3. **docs/cli/CLI.md** - CLI command reference
+4. **docs/common/TEMPLATES.md** - Template catalog
 
 ### For Contributors
 1. **Contributing.md** - Dev setup, coding standards
-2. **docs/ARCHITECTURE.md** - SOLID design, extension guide
+2. **docs/common/ARCHITECTURE.md** - SOLID design, extension guide
 3. **SECURITY.md** - Security policy, telemetry privacy
 
 ### For Maintainers
@@ -179,10 +179,10 @@ https://github.com/DecispherHQ/decision-guardian/releases/tag/v1.1.0
 
 - **Repo**: https://github.com/DecispherHQ/decision-guardian
 - **Changelog**: [CHANGELOG.md](../CHANGELOG.md)
-- **CLI Docs**: [docs/CLI.md](../docs/CLI.md)
-- **Architecture**: [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md)
-- **Templates**: [docs/TEMPLATES.md](../docs/TEMPLATES.md)
-- **Telemetry**: [docs/TELEMETRY.md](../docs/TELEMETRY.md)
+- **CLI Docs**: [docs/cli/CLI.md](../docs/cli/CLI.md)
+- **Architecture**: [docs/common/ARCHITECTURE.md](../docs/common/ARCHITECTURE.md)
+- **Templates**: [docs/common/TEMPLATES.md](../docs/common/TEMPLATES.md)
+- **Telemetry**: [docs/common/TELEMETRY.md](../docs/common/TELEMETRY.md)
 
 ---
 

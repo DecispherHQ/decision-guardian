@@ -207,7 +207,7 @@ npx decision-guardian check .decispher/decisions.md --staged --fail-on-critical
 - Initialize projects with templates (`init` command)
 - Single-file bundle (~430KB)
 
-✅ **Opt-in Telemetry** ([docs](docs/TELEMETRY.md))
+✅ **Opt-in Telemetry** ([docs](docs/common/TELEMETRY.md))
 - Privacy-first: no source code, no identifiers
 - Blocklist-enforced payload validation
 - Fire-and-forget, never blocks the tool

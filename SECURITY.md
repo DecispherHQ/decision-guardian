@@ -33,4 +33,4 @@ If you choose to enable telemetry (`DG_TELEMETRY=1`), the following guarantees a
 - **Aggregated storage**: Data is aggregated per-day on the server with a 90-day TTL
 - **Fire-and-forget**: Telemetry never blocks or slows down the tool — failures are silently ignored
 
-See [docs/TELEMETRY.md](docs/TELEMETRY.md) for full details.
+See [TELEMETRY.md](docs/common/TELEMETRY.md) for full details.

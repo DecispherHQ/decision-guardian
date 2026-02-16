@@ -83,23 +83,23 @@
 ### Documentation Coverage
 ✅ **New Docs (6 files)**
 - CHANGELOG.md
-- docs/CLI.md
-- docs/ARCHITECTURE.md
-- docs/TELEMETRY.md
-- docs/TEMPLATES.md
+- docs/cli/CLI.md
+- docs/common/ARCHITECTURE.md
+- docs/common/TELEMETRY.md
+- docs/common/TEMPLATES.md
 - workers/telemetry/README.md
 
 ✅ **Updated Docs (5 files)**
 - README.md (CLI section, trust & safety, demo GIF, 109 tests)
 - Contributing.md (structure, scopes, SOLID, 109 tests)
 - SECURITY.md (telemetry privacy)
-- documentation/FEATURES_ROADMAP.md (v1.1 shipped)
-- documentation/APP_WORKING.md (v1.1 architecture)
+- docs/common/FEATURES_ROADMAP.md (v1.1 shipped)
+- docs/common/APP_WORKING.md (v1.1 architecture)
 
 ✅ **Unchanged But Verified (4 files)**
-- documentation/DECISIONS_FORMAT.md
-- documentation/decision_guardian-guide_indepth.md
-- documentation/decision_guardian_guide_overview.md
+- docs/common/DECISIONS_FORMAT.md
+- docs/common/guide_indepth.md
+- docs/common/guide_overview.md
 - LICENSE
 
 ---
@@ -246,10 +246,10 @@ Technical:
 - CLI bundle: ~430KB
 
 Documentation:
-- docs/CLI.md - CLI reference
-- docs/ARCHITECTURE.md - SOLID design guide
-- docs/TELEMETRY.md - Privacy policy
-- docs/TEMPLATES.md - Template catalog"
+- docs/cli/CLI.md - CLI reference
+- docs/common/ARCHITECTURE.md - SOLID design guide
+- docs/common/TELEMETRY.md - Privacy policy
+- docs/common/TEMPLATES.md - Template catalog"
 
 # Push tag
 git push origin v1.1.0

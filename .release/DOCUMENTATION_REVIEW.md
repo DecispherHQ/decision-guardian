@@ -11,10 +11,10 @@
 
 ### New Documentation (All Complete)
 - ✅ `CHANGELOG.md` - Comprehensive v1.1.0 changelog created
-- ✅ `docs/CLI.md` - CLI reference exists and is accurate
-- ✅ `docs/ARCHITECTURE.md` - SOLID design documented
-- ✅ `docs/TELEMETRY.md` - Privacy policy documented
-- ✅ `docs/TEMPLATES.md` - Template catalog exists
+- ✅ `docs/cli/CLI.md` - CLI reference exists and is accurate
+- ✅ `docs/common/ARCHITECTURE.md` - SOLID design documented
+- ✅ `docs/common/TELEMETRY.md` - Privacy policy documented
+- ✅ `docs/common/TEMPLATES.md` - Template catalog exists
 - ✅ `workers/telemetry/README.md` - Cloudflare Worker setup guide exists
 - ✅ `.release/RELEASE_NOTES_v1.1.md` - Internal release notes created
 
@@ -22,13 +22,13 @@
 - ✅ `README.md` - Reflects current state (109 tests, CLI, templates, telemetry, architecture)
 - ✅ `Contributing.md` - Updated structure, 109 tests, new commit scopes
 - ✅ `SECURITY.md` - Telemetry privacy section added
-- ✅ `documentation/FEATURES_ROADMAP.md` - v1.1 features marked as shipped
-- ✅ `documentation/APP_WORKING.md` - Architecture updated for v1.1
+- ✅ `docs/common/FEATURES_ROADMAP.md` - v1.1 features marked as shipped
+- ✅ `docs/common/APP_WORKING.md` - Architecture updated for v1.1
 
 ### Unchanged Documentation (Still Accurate)
-- ✅ `documentation/DECISIONS_FORMAT.md` - Decision file format unchanged
-- ✅ `documentation/decision_guardian-guide_indepth.md` - In-depth guide still accurate
-- ✅ `documentation/decision_guardian_guide_overview.md` - Overview still accurate
+- ✅ `docs/common/DECISIONS_FORMAT.md` - Decision file format unchanged
+- ✅ `docs/common/guide_indepth.md` - In-depth guide still accurate
+- ✅ `docs/common/guide_overview.md` - Overview still accurate
 - ✅ `LICENSE` - MIT license unchanged
 - ✅ `action.yml` - Action metadata accurate (includes telemetry_enabled input)
 
@@ -103,7 +103,7 @@
 - ✅ "No data leaves GitHub by default"
 - ✅ Telemetry opt-in documented
 - ✅ Blocklist enforcement mentioned
-- ✅ Link to `docs/TELEMETRY.md`
+- ✅ Link to `docs/common/TELEMETRY.md`
 
 #### TELEMETRY.md
 - ✅ Privacy-first philosophy
@@ -119,7 +119,7 @@
 
 ### 6. CLI Documentation
 
-#### docs/CLI.md
+#### docs/cli/CLI.md
 - ✅ Installation instructions
 - ✅ All 4 commands documented (check, checkall, init, template)
 - ✅ Flag reference tables
@@ -129,7 +129,7 @@
 - ✅ Bundle size mentioned (~430KB)
 
 #### README.md CLI Section
-- ✅ Link to `docs/CLI.md`
+- ✅ Link to `docs/cli/CLI.md`
 - ✅ Feature list mentions CLI
 - ✅ Build instructions include `npm run build:cli`
 
@@ -139,7 +139,7 @@
 
 ### 7. Template Documentation
 
-#### docs/TEMPLATES.md
+#### docs/common/TEMPLATES.md
 - ✅ Exists (file found)
 - ✅ Template catalog
 - ✅ Customization guide
@@ -169,10 +169,10 @@
 - ✅ `https://twitter.com/gr8_alizaidi` (Twitter)
 
 #### Internal Links (Sample Check)
-- ✅ `[CLI.md](docs/CLI.md)` exists
-- ✅ `[ARCHITECTURE.md](docs/ARCHITECTURE.md)` exists
-- ✅ `[TELEMETRY.md](docs/TELEMETRY.md)` exists
-- ✅ `[TEMPLATES.md](docs/TEMPLATES.md)` exists
+- ✅ `[CLI.md](docs/cli/CLI.md)` exists
+- ✅ `[ARCHITECTURE.md](docs/common/ARCHITECTURE.md)` exists
+- ✅ `[TELEMETRY.md](docs/common/TELEMETRY.md)` exists
+- ✅ `[TEMPLATES.md](docs/common/TEMPLATES.md)` exists
 - ✅ `[Contributing.md](Contributing.md)` exists
 - ✅ `[SECURITY.md](SECURITY.md)` exists
 - ✅ `[LICENSE](LICENSE)` exists
@@ -355,7 +355,7 @@ npm run format         # ✅ Correct
 
 ---
 
-### docs/CLI.md
+### docs/cli/CLI.md
 **Status**: ✅ Excellent  
 **Highlights:**
 - All commands documented
@@ -368,7 +368,7 @@ npm run format         # ✅ Correct
 
 ---
 
-### docs/ARCHITECTURE.md
+### docs/common/ARCHITECTURE.md
 **Status**: ✅ Excellent  
 **Highlights:**
 - SOLID principles explained
@@ -381,7 +381,7 @@ npm run format         # ✅ Correct
 
 ---
 
-### docs/TELEMETRY.md
+### docs/common/TELEMETRY.md
 **Status**: ✅ Excellent  
 **Highlights:**
 - Privacy-first philosophy clear
@@ -395,13 +395,13 @@ npm run format         # ✅ Correct
 
 ---
 
-### docs/TEMPLATES.md
+### docs/common/TEMPLATES.md
 **Status**: ⚠️ Not Reviewed (assumed exists from file listing)  
 **Action:** View file to confirm content quality
 
 ---
 
-### documentation/FEATURES_ROADMAP.md
+### docs/common/FEATURES_ROADMAP.md
 **Status**: ✅ Updated Correctly  
 **Highlights:**
 - v1.1 section added with CLI, templates, telemetry
@@ -412,7 +412,7 @@ npm run format         # ✅ Correct
 
 ---
 
-### documentation/APP_WORKING.md
+### docs/common/APP_WORKING.md
 **Status**: ✅ Updated Correctly  
 **Highlights:**
 - Component architecture updated
