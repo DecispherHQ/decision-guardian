@@ -19,7 +19,7 @@
 
 ## Introduction
 
-Decision Guardian is a GitHub Action that automatically surfaces architectural decisions and important context when Pull Requests modify protected files. Instead of relying on institutional knowledge or hoping developers read documentation, Decision Guardian proactively alerts teams when changes touch sensitive areas of the codebase.
+Decision Guardian is a tool that automatically surfaces architectural decisions and important context when code changes modify protected files. It can be used as a **GitHub Action** for automated PR checks or as a **CLI tool** for local development and any CI/CD integration. Instead of relying on institutional knowledge or hoping developers read documentation, Decision Guardian proactively alerts teams when changes touch sensitive areas of the codebase.
 
 ### Key Features
 
@@ -42,6 +42,10 @@ Decision Guardian helps engineering teams by:
 
 ### How It Works
 
+Decision Guardian operates in two modes:
+
+**GitHub Action Mode:**
+
 1. You create a `decisions.md` file documenting architectural decisions
 2. Add Decision Guardian to your GitHub Actions workflow
 3. When a PR is opened, Decision Guardian:
@@ -49,6 +53,28 @@ Decision Guardian helps engineering teams by:
    - Matches them against your documented decisions
    - Posts a comment with relevant context
    - Optionally fails the check for critical violations
+
+**CLI Mode:**
+
+1. You create a `decisions.md` file documenting architectural decisions
+2. Install Decision Guardian CLI (`npm install -g decision-guardian` or use `npx`)
+3. Run checks locally or in any CI system:
+   - `check <path>` - Check specific decision file against git changes
+   - `checkall` - Auto-discover and check all `.decispher/` files
+   - Choose comparison mode: `--staged`, `--branch`, or `--all`
+   - Optionally fail on critical violations with `--fail-on-critical`
+4. Use in pre-commit hooks, GitLab CI, Jenkins, CircleCI, or any environment with git and Node.js
+
+### When to Use Each Mode
+
+| Use Case | Recommended Mode | Why |
+|----------|------------------|-----|
+| Automated PR checks on GitHub | GitHub Action | Native integration, automatic comments |
+| Local development | CLI | Fast feedback before pushing |
+| Pre-commit validation | CLI | Catch violations before commit |
+| GitLab/Jenkins/CircleCI | CLI | Works in any CI system |
+| Manual code review | CLI | On-demand checking |
+| Multiple hosting platforms | CLI | Portable across environments |
 
 ### Understanding Comment Updates
 
@@ -237,6 +263,661 @@ Decision Guardian needs these GitHub permissions:
 - `contents: read` - To read the decisions file
 
 These are automatically granted when using `${{ secrets.GITHUB_TOKEN }}`.
+
+---
+
+## CLI Mode Deep Dive
+
+The Decision Guardian CLI provides a flexible way to run decision checks locally or in any CI/CD environment. This section covers everything you need to know about using the CLI effectively.
+
+### Installation
+
+**Option 1: Global Installation**
+
+```bash
+npm install -g decision-guardian
+decision-guardian --version
+```
+
+Benefits:
+- Available as `decision-guardian` command globally
+- No `npx` prefix needed
+- Faster execution (no download step)
+
+**Option 2: Use with npx (No Installation)**
+
+```bash
+npx decision-guardian --help
+```
+
+Benefits:
+- No global installation required
+- Always uses latest version
+- Great for CI/CD environments
+
+**Option 3: Local Project Dependency**
+
+```bash
+npm install --save-dev decision-guardian
+# Then run via npm scripts
+```
+
+```json
+{
+  "scripts": {
+    "check-decisions": "decision-guardian checkall --fail-on-critical"
+  }
+}
+```
+
+### Command Reference
+
+#### `check <path>`
+
+Check a specific decision file against git changes.
+
+**Syntax:**
+```bash
+decision-guardian check <decision-file-path> [flags]
+```
+
+**Examples:**
+
+```bash
+# Check staged changes (default)
+decision-guardian check .decispher/decisions.md
+
+# Check against a specific branch
+decision-guardian check .decispher/decisions.md --branch main
+
+# Check against origin/main
+decision-guardian check .decispher/decisions.md --branch origin/main
+
+# Check all uncommitted changes
+decision-guardian check .decispher/decisions.md --all
+
+# Fail on critical violations
+decision-guardian check .decispher/decisions.md --fail-on-critical
+```
+
+**Flags:**
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--staged` | boolean | `true` | Compare staged changes (git diff --cached) |
+| `--branch <name>` | string | - | Compare against specified branch |
+| `--all` | boolean | `false` | Compare all uncommitted changes (staged + unstaged) |
+| `--fail-on-critical` | boolean | `false` | Exit with code 1 if critical decisions triggered |
+
+**Exit Codes:**
+- `0` - Success (no critical violations or `--fail-on-critical` not set)
+- `1` - Critical violations found (with `--fail-on-critical`) or error
+
+**What Gets Compared:**
+
+- `--staged` (default): Files in staging area (`git diff --cached HEAD`)
+- `--branch <name>`: Difference between current branch and `<name>` (`git diff <name>...HEAD`)
+- `--all`: All uncommitted changes (`git diff HEAD`)
+
+#### `checkall`
+
+Auto-discover and check all decision files in the `.decispher/` directory.
+
+**Syntax:**
+```bash
+decision-guardian checkall [flags]
+```
+
+**Examples:**
+
+```bash
+# Check all .decispher/ files with default (staged) mode
+decision-guardian checkall
+
+# Check against main branch
+decision-guardian checkall --branch main
+
+# Check all uncommitted changes and fail on critical
+decision-guardian checkall --all --fail-on-critical
+```
+
+**How it works:**
+1. Searches for `.decispher/` directory in current directory
+2. Recursively scans for all `.md` and `.markdown` files
+3. Parses and merges all decisions
+4. Evaluates them together against git changes
+5. Outputs consolidated results
+
+**Benefits:**
+- No need to specify decision file paths
+- Automatically picks up new decision files
+- Perfect for monorepos with multiple decision files
+
+#### `init`
+
+Scaffold a `.decispher/` directory with a starter decision file.
+
+**Syntax:**
+```bash
+decision-guardian init [--template <name>]
+```
+
+**Examples:**
+
+```bash
+# Create with basic template
+decision-guardian init
+
+# Use security template
+decision-guardian init --template security
+
+# Use database template
+decision-guardian init --template database
+```
+
+**Available Templates:**
+- `basic` - Simple starter with common patterns
+- `advanced-rules` - Examples using JSON rules system
+- `security` - Security-focused decisions
+- `database` - Database and migration decisions
+- `api` - API and breaking change decisions
+
+**What it creates:**
+```
+.decispher/
+└── decisions.md  (populated with chosen template)
+```
+
+#### `template <name>`
+
+Print or save a decision file template.
+
+**Syntax:**
+```bash
+decision-guardian template <template-name> [--output <path>]
+```
+
+**Examples:**
+
+```bash
+# Print to stdout
+decision-guardian template security
+
+# Save to file
+decision-guardian template security --output .decispher/security.md
+
+# Save to current directory
+decision-guardian template api -o .
+```
+
+### Comparison Modes Explained
+
+Understanding when to use each comparison mode:
+
+#### Staged Mode (`--staged`, default)
+
+**Use when:**
+- Running in pre-commit hooks
+- Checking what you're about to commit
+- Quick local validation before `git commit`
+
+**Git command equivalent:**
+```bash
+git diff --cached HEAD
+```
+
+**Example workflow:**
+```bash
+git add src/config/database.ts
+decision-guardian check .decispher/decisions.md  # Uses --staged by default
+git commit -m "Update database config"
+```
+
+#### Branch Mode (`--branch <name>`)
+
+**Use when:**
+- Checking all changes in feature branch vs main
+- CI/CD merge request validation
+- Comparing against remote branches
+
+**Git command equivalent:**
+```bash
+git diff <branch>...HEAD
+```
+
+**Example workflow:**
+```bash
+# On feature branch, compare against main
+decision-guardian check .decispher/decisions.md --branch main
+
+# Compare against remote main
+decision-guardian check .decispher/decisions.md --branch origin/main
+
+# GitLab CI: compare against target branch
+decision-guardian check .decispher/decisions.md --branch origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME
+```
+
+#### All Mode (`--all`)
+
+**Use when:**
+- Checking all uncommitted work (staged + unstaged)
+- Quick local check before pushing
+- Validating work in progress
+
+**Git command equivalent:**
+```bash
+git diff HEAD
+```
+
+**Example workflow:**
+```bash
+# Made changes but haven't staged yet
+decision-guardian check .decispher/decisions.md --all
+
+# See all violations before committing anything
+```
+
+### Git Integration Strategies
+
+#### Pre-commit Hook
+
+Prevent commits that violate critical decisions.
+
+**Setup:**
+
+Create `.git/hooks/pre-commit`:
+
+```bash
+#!/bin/sh
+# Check staged changes before commit
+npx decision-guardian check .decispher/decisions.md --staged --fail-on-critical
+
+# Store exit code
+STATUS=$?
+
+if [ $STATUS -ne 0 ]; then
+  echo "❌ Commit blocked: Critical decision violations found"
+  echo "Fix the issues or use 'git commit --no-verify' to bypass (not recommended)"
+  exit 1
+fi
+
+exit 0
+```
+
+Make executable:
+```bash
+chmod +x .git/hooks/pre-commit
+```
+
+**Alternative: Using Husky**
+
+```bash
+npm install --save-dev husky
+npx husky init
+```
+
+Create `.husky/pre-commit`:
+```bash
+#!/bin/sh
+npx decision-guardian checkall --staged --fail-on-critical
+```
+
+#### Pre-push Hook
+
+Check all commits before pushing to remote.
+
+Create `.git/hooks/pre-push`:
+
+```bash
+#!/bin/sh
+# Compare against origin/main before push
+npx decision-guardian checkall --branch origin/main --fail-on-critical
+```
+
+#### Manual Workflow Integration
+
+```bash
+# 1. Make changes
+vim src/config/database.ts
+
+# 2. Check decisions before staging
+decision-guardian checkall --all
+
+# 3. Stage if no violations
+git add src/config/database.ts
+
+# 4. Check again (staged only)
+decision-guardian checkall --staged --fail-on-critical
+
+# 5. Commit if passing
+git commit -m "Update database config"
+```
+
+### CI/CD Integration Patterns
+
+#### GitLab CI
+
+**Basic Integration:**
+
+```yaml
+# .gitlab-ci.yml
+stages:
+  - validate
+
+check-decisions:
+  stage: validate
+  image: node:20
+  only:
+    - merge_requests
+  script:
+    - npx decision-guardian check .decispher/decisions.md --branch origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME --fail-on-critical
+```
+
+**Advanced (with caching):**
+
+```yaml
+check-decisions:
+  stage: validate
+  image: node:20
+  only:
+    - merge_requests
+  cache:
+    key: decision-guardian
+    paths:
+      - node_modules/
+  before_script:
+    - npm install -g decision-guardian
+  script:
+    - decision-guardian checkall --branch origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME --fail-on-critical
+  allow_failure: false
+```
+
+#### Jenkins
+
+**Declarative Pipeline:**
+
+```groovy
+pipeline {
+  agent any
+  
+  stages {
+    stage('Check Decisions') {
+      steps {
+        script {
+          def exitCode = sh(
+            script: 'npx decision-guardian checkall --branch origin/main --fail-on-critical',
+            returnStatus: true
+          )
+          
+          if (exitCode != 0) {
+            error('Critical architectural decision violations found')
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+**Freestyle Project:**
+
+```bash
+# Build → Execute shell
+npx decision-guardian check .decispher/decisions.md --branch origin/main --fail-on-critical
+```
+
+#### CircleCI
+
+```yaml
+# .circleci/config.yml
+version: 2.1
+
+jobs:
+  check-decisions:
+    docker:
+      - image: cimg/node:20.0
+    steps:
+      - checkout
+      - run:
+          name: Check Architectural Decisions
+          command: npx decision-guardian checkall --branch origin/main --fail-on-critical
+
+workflows:
+  validate:
+    jobs:
+      - check-decisions
+```
+
+#### Bitbucket Pipelines
+
+```yaml
+# bitbucket-pipelines.yml
+pipelines:
+  pull-requests:
+    '**':
+      - step:
+          name: Check Decisions
+          image: node:20
+          script:
+            - npx decision-guardian checkall --branch origin/$BITBUCKET_PR_DESTINATION_BRANCH --fail-on-critical
+```
+
+#### Azure DevOps
+
+```yaml
+# azure-pipelines.yml
+trigger:
+  - main
+
+pr:
+  - main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+steps:
+  - task: NodeTool@0
+    inputs:
+      versionSpec: '20.x'
+    displayName: 'Install Node.js'
+
+  - script: |
+      npx decision-guardian checkall --branch origin/main --fail-on-critical
+    displayName: 'Check Architectural Decisions'
+```
+
+#### Travis CI
+
+```yaml
+# .travis.yml
+language: node_js
+node_js:
+  - 20
+
+script:
+  - npx decision-guardian checkall --branch $TRAVIS_BRANCH --fail-on-critical
+```
+
+### Advanced CLI Usage Patterns
+
+#### Pattern 1: Multi-Stage Validation
+
+Check at different stages of development:
+
+```bash
+#!/bin/bash
+# validate.sh - Multi-stage decision checking
+
+echo "Stage 1: Checking unstaged changes..."
+decision-guardian checkall --all
+
+echo "Stage 2: Checking staged changes..."
+decision-guardian checkall --staged
+
+echo "Stage 3: Checking against main branch..."
+decision-guardian checkall --branch main --fail-on-critical
+```
+
+#### Pattern 2: Conditional Execution
+
+Only run on specific file types:
+
+```bash
+# Check if any .ts files changed
+if git diff --name-only --cached | grep -q '\.ts$'; then
+  echo "TypeScript files changed, checking decisions..."
+  decision-guardian checkall --staged --fail-on-critical
+else
+  echo "No TypeScript files changed, skipping decision check"
+fi
+```
+
+#### Pattern 3: Custom Output Handling
+
+```bash
+# Capture output for logging
+OUTPUT=$(decision-guardian checkall --branch main 2>&1)
+EXIT_CODE=$?
+
+# Log to file
+echo "$OUTPUT" >> decision-check.log
+
+# Send to monitoring system
+if [ $EXIT_CODE -ne 0 ]; then
+  curl -X POST https://monitoring.example.com/alert \
+    -d "message=$OUTPUT"
+fi
+
+exit $EXIT_CODE
+```
+
+#### Pattern 4: Directory-Specific Checks
+
+For monorepos with multiple decision file sets:
+
+```bash
+#!/bin/bash
+# check-all-services.sh
+
+SERVICES=("auth" "api" "frontend")
+
+for service in "${SERVICES[@]}"; do
+  echo "Checking $service decisions..."
+  decision-guardian check ".decispher/$service/decisions.md" --branch main --fail-on-critical
+done
+```
+
+### Troubleshooting CLI-Specific Issues
+
+#### Issue: "No git repository found"
+
+**Cause:** CLI requires git to determine changed files
+
+**Solution:**
+```bash
+# Ensure you're in a git repository
+git init  # If new project
+git remote add origin <url>  # If needed
+```
+
+#### Issue: "No changes detected"
+
+**Cause:** No files in the comparison
+
+**Solutions:**
+```bash
+# Check what would be compared
+git diff --cached  # For --staged mode
+git diff HEAD  # For --all mode
+git diff main...HEAD  # For --branch main mode
+
+# Ensure files are staged (for --staged mode)
+git add . 
+```
+
+#### Issue: "Error reading decision file"
+
+**Cause:** File path incorrect or file doesn't exist
+
+**Solutions:**
+```bash
+# Verify file exists
+ls -la .decispher/decisions.md
+
+# Use absolute path
+decision-guardian check $(pwd)/.decispher/decisions.md
+
+# Use checkall to auto-discover
+decision-guardian checkall
+```
+
+#### Issue: "Exit code 1 but no violations shown"
+
+**Cause:** Parse error in decision file
+
+**Solution:**
+- Check decision file syntax
+- Look for malformed decision IDs
+- Validate JSON in Rules blocks
+- Review error output carefully
+
+### Performance Considerations
+
+**CLI vs GitHub Action:**
+
+| Aspect | CLI | GitHub Action |
+|--------|-----|---------------|
+| **Execution** | Local machine/CI runner | GitHub-hosted runner |
+| **Speed** | Depends on machine | ~2-5 seconds overhead |
+| **File Access** | Direct filesystem | Via checkout action |
+| **Git History** | Full local history | Shallow clone by default |
+| **Caching** | Manual/CI caching | Automatic via Actions cache |
+
+**Optimization Tips:**
+
+```bash
+# 1. Use global installation for faster execution
+npm install -g decision-guardian
+
+# 2. Cache in CI
+# GitLab CI
+cache:
+  paths:
+    - node_modules/
+
+# CircleCI
+- restore_cache:
+    keys:
+      - v1-dependencies-{{ checksum "package.json" }}
+
+# 3. Use checkall instead of multiple check commands
+decision-guardian checkall  # ✅ Single execution
+# vs
+decision-guardian check file1.md  # ❌ Multiple executions
+decision-guardian check file2.md
+```
+
+### Environment Variables
+
+Control CLI behavior via environment variables:
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DG_TELEMETRY` | Enable anonymous telemetry | `0` (disabled) |
+| `DG_TELEMETRY_URL` | Override telemetry endpoint | - |
+| `NODE_ENV` | Affects debug output | - |
+
+**Example:**
+
+```bash
+# Disable telemetry
+export DG_TELEMETRY=0
+decision-guardian checkall
+
+# Enable telemetry
+export DG_TELEMETRY=1
+decision-guardian checkall
+```
 
 ---
 

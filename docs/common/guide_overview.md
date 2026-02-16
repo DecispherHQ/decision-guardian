@@ -6,7 +6,7 @@
 
 ## About
 
-**Decision Guardian** is a GitHub Action that automatically surfaces architectural decisions and critical context when Pull Requests modify protected files. Instead of relying on tribal knowledge or hoping developers read documentation, Decision Guardian proactively alerts teams when changes touch sensitive areas of the codebase.
+**Decision Guardian** is a tool that automatically surfaces architectural decisions and critical context when code changes modify protected files. Use it as a **GitHub Action** for automated PR checks, or as a **CLI tool** for local development and any CI/CD integration. Instead of relying on tribal knowledge or hoping developers read documentation, Decision Guardian proactively alerts teams when changes touch sensitive areas of the codebase.
 
 **Author**: Ali Abbas  
 **Project**: Decispher  
@@ -153,6 +153,95 @@ Decision Guardian requires:
 - `contents: read` - Read decision files
 
 These are automatically granted via `secrets.GITHUB_TOKEN`.
+
+### CLI Tool Installation
+
+For local development or non-GitHub CI systems, install Decision Guardian as a CLI tool:
+
+**Global Installation:**
+```bash
+npm install -g decision-guardian
+decision-guardian --version
+```
+
+**Use Without Installation:**
+```bash
+npx decision-guardian --help
+```
+
+**Basic Commands:**
+
+```bash
+# Check specific decision file against staged changes
+decision-guardian check .decispher/decisions.md
+
+# Check against a branch
+decision-guardian check .decispher/decisions.md --branch main
+
+# Check all uncommitted changes
+decision-guardian check .decispher/decisions.md --all
+
+# Auto-discover all .decispher/ files
+decision-guardian checkall --fail-on-critical
+
+# Initialize a new project with template
+decision-guardian init --template security
+```
+
+**Command Flags:**
+
+| Flag | Description |
+|------|-------------|
+| `--staged` | Compare staged changes (default for `check`) |
+| `--branch <base>` | Compare against a specific branch |
+| `--all` | Compare all uncommitted changes |
+| `--fail-on-critical` | Exit with code 1 if critical decisions are triggered |
+
+**CI/CD Integration Examples:**
+
+**GitLab CI:**
+```yaml
+check-decisions:
+  image: node:20
+  script:
+    - npx decision-guardian check .decispher/decisions.md --branch $CI_MERGE_REQUEST_TARGET_BRANCH_NAME --fail-on-critical
+```
+
+**CircleCI:**
+```yaml
+jobs:
+  check-decisions:
+    docker:
+      - image: cimg/node:20.0
+    steps:
+      - checkout
+      - run: npx decision-guardian checkall --fail-on-critical
+```
+
+**Jenkins:**
+```groovy
+pipeline {
+  agent any
+  stages {
+    stage('Check Decisions') {
+      steps {
+        sh 'npx decision-guardian check .decispher/decisions.md --branch origin/main --fail-on-critical'
+      }
+    }
+  }
+}
+```
+
+**Pre-commit Hook:**
+```bash
+#!/bin/sh
+# .git/hooks/pre-commit
+npx decision-guardian check .decispher/decisions.md --staged --fail-on-critical
+```
+
+**Exit Codes:**
+- `0` - No violations or only non-critical violations
+- `1` - Critical violations found (with `--fail-on-critical`) or error occurred
 
 ---
 
