@@ -60,67 +60,92 @@ Decision Guardian is a GitHub Action that surfaces architectural decisions when 
 
 ---
 
-## Component Architecture
+## Component Architecture (v1.1)
 
 ```
 src/
-├── main.ts                  # Orchestrator
+├── main.ts                          # GitHub Action Orchestrator
 │   ├─► Loads configuration
 │   ├─► Coordinates all components
-│   └─► Handles top-level errors
+│   ├─► Reports metrics
+│   └─► Sends telemetry (opt-in)
 │
-├── parser.ts                # Decision Parser
-│   ├─► Parses Markdown files
-│   ├─► Extracts structured data
-│   ├─► Validates format
-│   └─► Supports directory scanning
+├── core/                            # Platform-agnostic engine
+│   ├── interfaces/
+│   │   ├── logger.ts                # ILogger interface
+│   │   └── scm-provider.ts          # ISCMProvider interface
+│   │
+│   ├── parser.ts                    # Decision Parser
+│   │   ├─► Parses Markdown files
+│   │   ├─► Extracts structured data
+│   │   ├─► Validates format
+│   │   └─► Supports directory scanning
+│   │
+│   ├── matcher.ts                   # File Matcher
+│   │   ├─► Uses Trie for O(log n) lookup
+│   │   ├─► Evaluates glob patterns
+│   │   ├─► Accepts ILogger (injected)
+│   │   └─► Coordinates rule evaluation
+│   │
+│   ├── rule-evaluator.ts            # Advanced Rules
+│   │   ├─► Evaluates JSON rules
+│   │   ├─► Boolean logic (AND/OR)
+│   │   ├─► Content matching
+│   │   └─► Parallel processing (batch 50)
+│   │
+│   ├── content-matchers.ts          # Content Matching
+│   │   ├─► String mode
+│   │   ├─► Regex mode (VM sandbox, 5s timeout)
+│   │   ├─► Line range mode
+│   │   ├─► Full file mode
+│   │   └─► JSON path mode
+│   │
+│   ├── trie.ts                      # Pattern Trie
+│   ├── rule-parser.ts               # Rule Parser
+│   ├── metrics.ts                   # MetricsCollector + getSnapshot()
+│   ├── logger.ts                    # logStructured() (ILogger-based)
+│   ├── health.ts                    # checkDecisionFileExists()
+│   ├── types.ts                     # Core types
+│   └── rule-types.ts                # Rule types
 │
-├── matcher.ts               # File Matcher
-│   ├─► Uses Trie for O(log n) lookup
-│   ├─► Evaluates glob patterns
-│   └─► Coordinates rule evaluation
+├── adapters/
+│   ├── github/
+│   │   ├── actions-logger.ts        # ILogger → @actions/core
+│   │   ├── github-provider.ts       # ISCMProvider → GitHub API
+│   │   ├── comment.ts               # PR comment management
+│   │   └── health.ts                # validateToken()
+│   └── local/
+│       ├── console-logger.ts        # ILogger → ANSI console
+│       └── local-git-provider.ts    # ISCMProvider → git diff
 │
-├── rule-evaluator.ts        # Advanced Rules
-│   ├─► Evaluates JSON rules
-│   ├─► Boolean logic (AND/OR)
-│   ├─► Content matching
-│   └─► Parallel processing (batch 50)
+├── cli/
+│   ├── index.ts                     # #!/usr/bin/env node
+│   ├── commands/
+│   │   ├── check.ts                 # check / checkall
+│   │   ├── init.ts                  # scaffold .decispher/
+│   │   └── template.ts             # template output
+│   ├── formatter.ts                 # Colored output tables
+│   └── paths.ts                     # Template path resolution
 │
-├── content-matchers.ts      # Content Matching
-│   ├─► String mode
-│   ├─► Regex mode (VM sandbox, 5s timeout)
-│   ├─► Line range mode
-│   ├─► Full file mode
-│   └─► JSON path mode
-│
-├── comment.ts               # Comment Manager
-│   ├─► Creates/updates PR comments
-│   ├─► Hash-based idempotency
-│   ├─► Groups by severity
-│   ├─► Progressive truncation (5 layers)
-│   └─► Duplicate cleanup
-│
-├── github-utils.ts          # GitHub API
-│   ├─► File diff retrieval
-│   ├─► Pagination handling
-│   ├─► Rate limit management
-│   └─► Circuit breaker pattern
-│
-├── trie.ts                  # Pattern Trie
-│   ├─► Efficient candidate lookup
-│   └─► Wildcard support
-│
-├── rule-parser.ts           # Rule Parser
-│   ├─► Parses JSON rules
-│   ├─► Validates structure
-│   └─► Loads external rule files
-│
-├── types.ts                 # Type Definitions
-├── rule-types.ts            # Rule Type Definitions
-├── logger.ts                # Structured Logging
-├── metrics.ts               # Performance Metrics
-└── health.ts                # Health Validation
+└── telemetry/
+    ├── sender.ts                    # Opt-in fire-and-forget
+    ├── payload.ts                   # Type-safe builder
+    └── privacy.ts                   # Blocklist validation
+
+workers/telemetry/                   # Cloudflare Worker backend
+├── worker.ts                        # POST /collect + GET /stats
+├── wrangler.toml                    # Deployment config
+└── README.md                        # Setup instructions
+
+templates/                           # Decision file templates
+├── basic.md
+├── advanced-rules.md
+├── security.md
+├── database.md
+└── api.md
 ```
+
+> **Design principle**: `src/core/` has **zero** `@actions/*` imports. All platform-specific code lives in `src/adapters/`. New SCM providers (GitLab, Bitbucket) are added by implementing `ISCMProvider` — no core changes needed.
 
 ---
 
