@@ -11,11 +11,28 @@ const child_process_1 = require("child_process");
 class LocalGitProvider {
     config;
     constructor(config) {
+        // Validate baseBranch to prevent shell injection
+        if (config.baseBranch && !this.isValidBranchName(config.baseBranch)) {
+            throw new Error(`Invalid baseBranch: "${config.baseBranch}". ` +
+                'Branch names must only contain alphanumeric characters, hyphens, underscores, slashes, and dots.');
+        }
         this.config = {
             mode: config.mode,
             baseBranch: config.baseBranch || 'main',
             cwd: config.cwd || process.cwd(),
         };
+    }
+    /**
+     * Validate branch name to prevent shell injection.
+     * Allows: letters, numbers, -, _, /, .
+     * Git allows more, but we restrict to safe subset.
+     */
+    isValidBranchName(name) {
+        // Only allow safe characters: alphanumeric, -, _, /, .
+        // Reject shell metacharacters: ; & | $ ` \ " ' < > ( ) etc.
+        return /^[a-zA-Z0-9\-_.\/]+$/.test(name) &&
+            name.length > 0 &&
+            name.length < 256; // Reasonable length limit
     }
     /**
      * Get list of changed file paths from git diff.

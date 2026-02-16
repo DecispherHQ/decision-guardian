@@ -44,3 +44,57 @@ jobs:
             exit 1
           fi
 
+  cli-smoke-test:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build CLI
+        run: npm run build:cli
+      
+      - name: Pack package
+        run: npm pack
+      
+      - name: Install globally from tarball
+        run: npm install -g decision-guardian-*.tgz
+      
+      - name: Test CLI can find templates (init help)
+        run: decision-guardian init --help
+      
+      - name: Test template command
+        run: decision-guardian template --help || true
+      
+      - name: Initialize in test directory
+        run: |
+          mkdir /tmp/test-decispher
+          cd /tmp/test-decispher
+          decision-guardian init .
+          
+      - name: Verify .decispher directory was created
+        run: |
+          if [ ! -d "/tmp/test-decispher/.decispher" ]; then
+            echo "Error: .decispher directory not created"
+            exit 1
+          fi
+          
+      - name: Verify config file exists and has content
+        run: |
+          if [ ! -f "/tmp/test-decispher/.decispher/config.yaml" ]; then
+            echo "Error: config.yaml not found"
+            exit 1
+          fi
+          if [ ! -s "/tmp/test-decispher/.decispher/config.yaml" ]; then
+            echo "Error: config.yaml is empty"
+            exit 1
+          fi
+          echo "✓ Templates are accessible after global install"
