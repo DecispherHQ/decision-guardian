@@ -15,12 +15,6 @@ const SEVERITY_ICON: Record<string, string> = {
     info: `${CYAN}●${RESET}`,
 };
 
-const SEVERITY_LABEL: Record<string, string> = {
-    critical: `${RED}CRITICAL${RESET}`,
-    warning: `${YELLOW}WARNING${RESET}`,
-    info: `${CYAN}INFO${RESET}`,
-};
-
 export function formatMatchesTable(matches: DecisionMatch[]): string {
     if (matches.length === 0) {
         return `\n  ${GREEN}✔${RESET} No decision violations found.\n`;

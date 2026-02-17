@@ -255,7 +255,7 @@ function loadConfig(): ActionConfig {
 /**
  * Report metrics using the decoupled snapshot approach
  */
-function reportMetrics(config: ActionConfig): void {
+function reportMetrics(_config: ActionConfig): void {
   const snapshot = metrics.getSnapshot();
 
   logger.info('=== Performance Metrics ===');

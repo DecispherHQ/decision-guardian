@@ -134,12 +134,13 @@ export class RuleParser {
         }
 
         switch (rule.mode) {
-            case 'string':
+            case 'string': {
                 if (!rule.patterns || !Array.isArray(rule.patterns)) {
                     throw new Error('String mode requires patterns array');
                 }
                 break;
-            case 'regex':
+            }
+            case 'regex': {
                 if (!rule.pattern) {
                     throw new Error('Regex mode requires pattern');
                 }
@@ -166,6 +167,7 @@ export class RuleParser {
                     throw new Error(`Invalid regex pattern syntax: ${rule.pattern}`);
                 }
                 break;
+            }
             case 'line_range':
                 if (typeof rule.start !== 'number' || typeof rule.end !== 'number') {
                     throw new Error('Line range mode requires start and end numbers');

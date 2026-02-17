@@ -17,6 +17,17 @@
             }
         ]
     },
+    "overrides": [
+        {
+            "files": [
+                "src/adapters/local/console-logger.ts",
+                "src/cli/**/*.ts"
+            ],
+            "rules": {
+                "no-console": "off"
+            }
+        }
+    ],
     "env": {
         "node": true,
         "jest": true

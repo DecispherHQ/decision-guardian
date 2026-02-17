@@ -5,7 +5,7 @@ import { validatePrivacy } from './privacy';
 const DEFAULT_ENDPOINT = 'https://decision-guardian-telemetry.iamalizaidi110.workers.dev/collect';
 const TIMEOUT_MS = 5000;
 
-function isOptedIn(source: 'action' | 'cli'): boolean {
+function isOptedIn(_source: 'action' | 'cli'): boolean {
     // Unified telemetry control for both GitHub Actions and CLI via DG_TELEMETRY env
     // Opt-out model: telemetry is enabled by default
     // Users must explicitly set DG_TELEMETRY to '0' or 'false' to disable
