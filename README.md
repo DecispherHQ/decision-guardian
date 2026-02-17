@@ -8,12 +8,12 @@
 [![Website](https://img.shields.io/badge/Website-decision--guardian.decispher.com-blueviolet)](https://decision-guardian.decispher.com/)
 [![Security Policy](https://img.shields.io/badge/Security-Policy-brightgreen.svg)](SECURITY.md)
 
-Decision Guardian is a GitHub Action that automatically surfaces architectural decisions and critical context when Pull Requests modify protected files. Instead of relying on tribal knowledge, Decision Guardian proactively alerts teams when changes touch sensitive code.
+Decision Guardian is a tool that automatically surfaces architectural decisions and critical context when code changes modify protected files. Use it as a **GitHub Action** for automated PR checks, or as a **CLI tool** for local development and any CI/CD system. Instead of relying on tribal knowledge, Decision Guardian proactively alerts teams when changes touch sensitive code.
 
 **Created by [Ali Abbas](https://github.com/gr8-alizaidi) • Part of the [Decispher](https://decispher.com) project**
 
 <div align="center">
-  <img src="documentation/demo.gif" alt="Decision Guardian Demo" width="100%">
+  <img src="docs/common/images/demo.gif" alt="Decision Guardian Demo" width="100%">
 </div>
 
 ---
@@ -52,6 +52,8 @@ See [SECURITY.md](SECURITY.md) for our full security policy.
 ---
 
 ## 🚀 Quick Start
+
+### GitHub Action Setup
 
 ### 1. Create Decision File
 
@@ -118,6 +120,60 @@ When someone opens a PR modifying `src/db/pool.ts`, Decision Guardian automatica
 
 ---
 
+### CLI Setup
+
+For local development or non-GitHub CI systems:
+
+#### 1. Install
+
+```bash
+npm install -g decision-guardian
+# or use directly without installation
+npx decision-guardian --help
+```
+
+#### 2. Check Changes Locally
+
+```bash
+# Check staged changes
+decision-guardian check .decispher/decisions.md
+
+# Check against a branch
+decision-guardian check .decispher/decisions.md --branch main
+
+# Check all uncommitted changes
+decision-guardian check .decispher/decisions.md --all
+
+# Auto-discover all decision files
+decision-guardian checkall --fail-on-critical
+```
+
+#### 3. Use in Any CI System
+
+**GitLab CI:**
+```yaml
+check-decisions:
+  script:
+    - npx decision-guardian check .decispher/decisions.md --branch $CI_MERGE_REQUEST_TARGET_BRANCH_NAME --fail-on-critical
+```
+
+**Jenkins:**
+```groovy
+stage('Check Decisions') {
+  steps {
+    sh 'npx decision-guardian checkall --fail-on-critical'
+  }
+}
+```
+
+**Pre-commit Hook:**
+```bash
+#!/bin/sh
+npx decision-guardian check .decispher/decisions.md --staged --fail-on-critical
+```
+
+---
+
 ## ✨ Features
 
 ### Core Capabilities
@@ -144,13 +200,14 @@ When someone opens a PR modifying `src/db/pool.ts`, Decision Guardian automatica
 - Self-healing duplicate cleanup
 - Progressive truncation for large PRs
 
-✅ **Local CLI** ([docs](docs/CLI.md))
-- Run checks locally without GitHub Actions
-- Works with any CI system (GitLab, Jenkins, etc.)
-- Templates for quick setup
+✅ **Local CLI** ([docs](docs/cli/CLI.md))
+- Run `check` or `checkall` commands locally
+- Compare against staged changes, branches, or all uncommitted files
+- Works with any CI system (GitLab, Jenkins, CircleCI, etc.)
+- Initialize projects with templates (`init` command)
 - Single-file bundle (~430KB)
 
-✅ **Opt-in Telemetry** ([docs](docs/TELEMETRY.md))
+✅ **Opt-in Telemetry** ([docs](docs/common/TELEMETRY.md))
 - Privacy-first: no source code, no identifiers
 - Blocklist-enforced payload validation
 - Fire-and-forget, never blocks the tool
@@ -611,10 +668,10 @@ node dist/cli/index.js --help
 
 ### Documentation
 
-- [CLI Usage](docs/CLI.md)
-- [Architecture](docs/ARCHITECTURE.md)
-- [Templates](docs/TEMPLATES.md)
-- [Telemetry](docs/TELEMETRY.md)
+- [CLI Usage](docs/cli/CLI.md)
+- [Architecture](docs/common/ARCHITECTURE.md)
+- [Templates](docs/common/TEMPLATES.md)
+- [Telemetry](docs/common/TELEMETRY.md)
 
 
 ---

@@ -92,7 +92,6 @@ npx decision-guardian template advanced-rules
 ### 3. Opt-in Telemetry System
 
 **Privacy-first design:**
-- **Disabled by default** - must explicitly enable via `DG_TELEMETRY=1`
 - **Zero PII collection** - no source code, repo names, file names, usernames, emails
 - **Runtime blocklist** - privacy module validates every payload, throws on violation
 - **Fire-and-forget** - 5-second timeout, never blocks or affects tool behavior
@@ -246,10 +245,10 @@ src/
 | File | Description |
 |------|-------------|
 | `CHANGELOG.md` | **NEW** - Comprehensive v1.1 changelog |
-| `docs/CLI.md` | **NEW** - CLI command reference |
-| `docs/ARCHITECTURE.md` | **NEW** - SOLID design, extension guide |
-| `docs/TELEMETRY.md` | **NEW** - Privacy policy, opt-in guide |
-| `docs/TEMPLATES.md` | **NEW** - Template catalog |
+| `docs/cli/CLI.md` | **NEW** - CLI command reference |
+| `docs/common/ARCHITECTURE.md` | **NEW** - SOLID design, extension guide |
+| `docs/common/TELEMETRY.md` | **NEW** - Privacy policy, opt-in guide |
+| `docs/common/TEMPLATES.md` | **NEW** - Template catalog |
 | `workers/telemetry/README.md` | **NEW** - Cloudflare Worker setup |
 
 ### Updated Files
@@ -258,8 +257,8 @@ src/
 | `README.md` | Added CLI section, trust & safety, demo GIF, updated architecture |
 | `Contributing.md` | Updated structure, added adapter guidelines, new commit scopes |
 | `SECURITY.md` | Added telemetry privacy section |
-| `documentation/FEATURES_ROADMAP.md` | Moved CLI/templates to v1.1 (shipped) |
-| `documentation/APP_WORKING.md` | Updated architecture diagram for v1.1 structure |
+| `docs/common/FEATURES_ROADMAP.md` | Moved CLI/templates to v1.1 (shipped) |
+| `docs/common/APP_WORKING.md` | Updated architecture diagram for v1.1 structure |
 
 ### Documentation Review Checklist
 

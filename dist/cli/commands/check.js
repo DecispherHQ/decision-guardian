@@ -101,6 +101,9 @@ async function runCheck(opts) {
         metrics_1.metrics.addMatchesFound(matches.length);
         metrics_1.metrics.setDuration(Date.now() - startTime);
         const grouped = matcher.groupBySeverity(matches);
+        metrics_1.metrics.addCriticalMatches(grouped.critical.length);
+        metrics_1.metrics.addWarningMatches(grouped.warning.length);
+        metrics_1.metrics.addInfoMatches(grouped.info.length);
         console.log((0, formatter_1.formatMatchesTable)(matches));
         const snapshot = metrics_1.metrics.getSnapshot();
         console.log((0, formatter_1.formatSummary)({

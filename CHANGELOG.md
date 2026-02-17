@@ -48,7 +48,7 @@ npx decision-guardian init --template database
 #### **Opt-in Telemetry System**
 Privacy-first, anonymous usage analytics to improve Decision Guardian:
 
-- **Disabled by default** - Must explicitly opt-in via `DG_TELEMETRY=1` environment variable
+- **Enabled by default** - Must explicitly opt-out via `DG_TELEMETRY=0` environment variable
 - **Zero PII collection**:
   - ❌ No source code, file contents, or decision text
   - ❌ No repo names, org names, usernames, emails, commit messages, branch names, file names, or file paths
@@ -103,10 +103,10 @@ Complete rewrite to support multiple platforms and extensibility:
 ### 📚 Documentation
 
 #### **New Documentation Files**
-- **`docs/CLI.md`** - Complete CLI reference with all commands, flags, and examples
-- **`docs/ARCHITECTURE.md`** - SOLID design principles, module map, data flow diagrams, extensibility guide
-- **`docs/TELEMETRY.md`** - Privacy policy, opt-in instructions, payload schema, architecture
-- **`docs/TEMPLATES.md`** - Template catalog and customization guide
+- **`docs/cli/CLI.md`** - Complete CLI reference with all commands, flags, and examples
+- **`docs/common/ARCHITECTURE.md`** - SOLID design principles, module map, data flow diagrams, extensibility guide
+- **`docs/common/TELEMETRY.md`** - Privacy policy, opt-in instructions, payload schema, architecture
+- **`docs/common/TEMPLATES.md`** - Template catalog and customization guide
 - **`workers/telemetry/README.md`** - Cloudflare Worker setup and deployment instructions
 
 #### **Updated Documentation**
@@ -129,13 +129,13 @@ Complete rewrite to support multiple platforms and extensibility:
   - Clarified "no external network calls by default" guarantee
   - Documented blocklist enforcement for telemetry payloads
   
-- **`documentation/FEATURES_ROADMAP.md`**:
+- **`FEATURES_ROADMAP.md`**:
   - Moved CLI package from "Planned" to "v1.1.0" (Shipped)
   - Moved Decision Templates from "Planned" to "v1.1.0" (Shipped)
   - Updated GitLab/Bitbucket support status to "Architecture ready (ISCMProvider)"
   - Added v1.1 feature summary with CLI, templates, and telemetry details
   
-- **`documentation/APP_WORKING.md`**:
+- **`APP_WORKING.md`**:
   - Updated component architecture diagram to show `src/core/`, `src/adapters/`, `src/cli/`, `src/telemetry/`
   - Documented ILogger and ISCMProvider interfaces
   - Added CLI data flow diagram
@@ -202,10 +202,12 @@ decision-guardian/
 │   └── README.md                  # NEW: Setup guide
 │
 ├── docs/                          # NEW: CLI, architecture, telemetry docs
-│   ├── CLI.md
-│   ├── ARCHITECTURE.md
-│   ├── TELEMETRY.md
-│   └── TEMPLATES.md
+│   ├── cli/CLI.md
+│   ├── common/ARCHITECTURE.md
+│   ├── common/TELEMETRY.md
+│   ├── common/TEMPLATES.md
+│   └── common/guide_indepth.md
+│   └── github/APP_WORKING.md
 │
 ├── tests/                         # REORGANIZED and EXPANDED
 │   ├── core/                      # Tests for src/core/ modules
@@ -261,7 +263,6 @@ All backward-compatibility shims have been removed:
 ### 🔒 Security
 
 #### **Enhanced Privacy**
-- **No external network calls by default** - Telemetry is opt-in only (`DG_TELEMETRY=1`)
 - **Runtime blocklist enforcement** - Privacy module validates payloads before sending
 - **No PII in telemetry** - Comprehensive list of blocked fields enforced at module boundary
 - **Fire-and-forget** - Telemetry never affects tool behavior or exposes errors
@@ -427,7 +428,7 @@ Special thanks to early testers who provided feedback on the CLI UX and template
 - **Decision Inheritance** - `Extends: DECISION-BASE-001` for composable rules
 - **Cross-Repository Rules** - Share decisions across multiple repos
 
-See [FEATURES_ROADMAP.md](documentation/FEATURES_ROADMAP.md) for full roadmap.
+See [FEATURES_ROADMAP.md](docs/common/FEATURES_ROADMAP.md) for full roadmap.
 
 ---
 
@@ -452,11 +453,11 @@ See [FEATURES_ROADMAP.md](documentation/FEATURES_ROADMAP.md) for full roadmap.
 - `README.md` - Quick start, examples, configuration reference
 - `Contributing.md` - Development setup, coding standards
 - `SECURITY.md` - Trust guarantees, vulnerability reporting
-- `documentation/APP_WORKING.md` - Technical deep-dive
-- `documentation/DECISIONS_FORMAT.md` - Decision file specification
-- `documentation/FEATURES_ROADMAP.md` - Feature roadmap
-- `documentation/decision_guardian-guide_indepth.md` - Comprehensive guide
-- `documentation/decision_guardian_guide_overview.md` - High-level overview
+- `APP_WORKING.md` - Technical deep-dive
+- `DECISIONS_FORMAT.md` - Decision file specification
+- `FEATURES_ROADMAP.md` - Feature roadmap
+- `decision_guardian-guide_indepth.md` - Comprehensive guide
+- `decision_guardian_guide_overview.md` - High-level overview
 
 #### **Technology Stack**
 - TypeScript 5.3.x

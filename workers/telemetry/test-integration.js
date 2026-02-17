@@ -4,12 +4,15 @@
  * Tests that the worker endpoint is accessible and responding correctly
  */
 
-const WORKER_URL = 'https://decision-guardian-telemetry.iamalizaidi110.workers.dev';
+const WORKER_URL = process.env.WORKER_URL || 'https://decision-guardian-telemetry.iamalizaidi110.workers.dev';
+const STATS_KEY = process.env.STATS_KEY || 'your-secret-key-here';
 
 async function testStatsEndpoint() {
     console.log('🧪 Testing GET /stats endpoint...');
     try {
-        const response = await fetch(`${WORKER_URL}/stats`);
+        const response = await fetch(`${WORKER_URL}/stats`, {
+            headers: { 'X-Stats-Key': STATS_KEY }
+        });
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
@@ -76,7 +79,9 @@ async function testUpdatedStats() {
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
     try {
-        const response = await fetch(`${WORKER_URL}/stats`);
+        const response = await fetch(`${WORKER_URL}/stats`, {
+            headers: { 'X-Stats-Key': STATS_KEY }
+        });
         const data = await response.json();
 
         if (data.total_runs > 0) {

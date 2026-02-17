@@ -210,7 +210,7 @@ decision-guardian/
 ├── templates/                        # Decision file templates
 ├── workers/telemetry/                # Cloudflare Worker backend
 ├── docs/                             # CLI, Architecture, Telemetry docs
-├── documentation/                    # Existing guides and roadmap
+├── docs/                             # Existing guides and roadmap
 ├── tests/                            # Organized by module
 │   ├── core/
 │   ├── cli/

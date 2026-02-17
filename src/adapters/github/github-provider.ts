@@ -68,7 +68,7 @@ export class GitHubProvider implements ISCMProvider {
         }
 
         if (page > MAX_PAGES) {
-            this.logger.warning('PR has 3000+ files - only checking first 3000');
+            throw new Error('PR too large for automatic verification');
         }
 
         return files;
@@ -144,7 +144,7 @@ export class GitHubProvider implements ISCMProvider {
         }
 
         if (page > MAX_PAGES) {
-            this.logger.warning('PR has 3000+ files - only checking first 3000');
+            throw new Error('PR too large for automatic verification');
         }
 
         return Array.from(fileMap.values());
@@ -184,6 +184,10 @@ export class GitHubProvider implements ISCMProvider {
 
             if (data.length < 100) break;
             page++;
+        }
+
+        if (page > MAX_PAGES) {
+            throw new Error('PR too large for automatic verification');
         }
     }
 
@@ -230,11 +234,21 @@ export class GitHubProvider implements ISCMProvider {
                 }
 
                 let waitMs = 60000;
+                let calculated = false;
+
                 if (err.response?.headers['x-ratelimit-reset']) {
-                    const resetTime = parseInt(err.response.headers['x-ratelimit-reset'], 10) * 1000;
-                    waitMs = Math.max(resetTime - Date.now() + 1000, 1000);
-                } else if (err.response?.headers['retry-after']) {
-                    waitMs = parseInt(err.response.headers['retry-after'], 10) * 1000;
+                    const resetEpoch = parseInt(err.response.headers['x-ratelimit-reset'], 10);
+                    if (!isNaN(resetEpoch)) {
+                        waitMs = Math.max(resetEpoch * 1000 - Date.now() + 1000, 1000);
+                        calculated = true;
+                    }
+                }
+
+                if (!calculated && err.response?.headers['retry-after']) {
+                    const retrySeconds = parseInt(err.response.headers['retry-after'], 10);
+                    if (!isNaN(retrySeconds)) {
+                        waitMs = retrySeconds * 1000;
+                    }
                 }
 
                 if (waitMs > MAX_WAIT_TIME_MS) {

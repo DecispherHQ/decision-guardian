@@ -421,7 +421,7 @@ A: Update the status to "Deprecated" or "Superseded". Link to the new decision. 
 
 - **[Decision Guardian Website](https://decision-guardian.decispher.com/)** - Official website with live demo
 - **[Decision Guardian GitHub](https://github.com/DecispherHQ/decision-guardian)** - Installation & setup
-- **[DECISIONS_FORMAT.md](../documentation/DECISIONS_FORMAT.md)** - Complete format reference
+- **[DECISIONS_FORMAT.md](../docs/common/DECISIONS_FORMAT.md)** - Complete format reference
 - **[CONTRIBUTING.md](../Contributing.md)** - How to contribute examples
 
 ---

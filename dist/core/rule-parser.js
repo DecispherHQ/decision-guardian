@@ -32,12 +32,16 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.RuleParser = void 0;
 /**
  * Rule Parser - Extracts JSON rules from markdown decision blocks
  */
 const fs = __importStar(require("fs/promises"));
+const safe_regex_1 = __importDefault(require("safe-regex"));
 const path = __importStar(require("path"));
 const rule_types_1 = require("./rule-types");
 class RuleParser {
@@ -75,9 +79,15 @@ class RuleParser {
                 // Resolve path relative to the decision file
                 const resolvedPath = path.resolve(sourceDir, relPath);
                 const normalizedWorkspace = path.normalize(workspaceRoot);
-                if (!resolvedPath.startsWith(normalizedWorkspace) &&
-                    !resolvedPath.includes('node_modules')) {
-                    // Path is outside workspace - future enhancement: add security warning
+                const normalizedPath = path.normalize(resolvedPath);
+                // Security check: Reject paths outside workspace (Path Traversal protection)
+                if (!resolvedPath.startsWith(normalizedWorkspace + path.sep) && resolvedPath !== normalizedWorkspace) {
+                    return {
+                        rules: null,
+                        error: `Security Error: External rule file '${relPath}' resolves to a path outside the workspace. ` +
+                            `Only files within the workspace are allowed. ` +
+                            `Resolved: ${normalizedPath}, Workspace: ${normalizedWorkspace}`,
+                    };
                 }
                 const fileContent = await fs.readFile(resolvedPath, 'utf-8');
                 const parsed = JSON.parse(fileContent);
@@ -151,11 +161,25 @@ class RuleParser {
                 if (!rule.pattern) {
                     throw new Error('Regex mode requires pattern');
                 }
+                let isSafe;
+                try {
+                    isSafe = (0, safe_regex_1.default)(rule.pattern);
+                }
+                catch (e) {
+                    throw new Error(`Invalid regex pattern (safe-check failed): ${rule.pattern}`);
+                }
+                if (!isSafe) {
+                    throw new Error(`Unsafe regex pattern: ${rule.pattern}`);
+                }
+                const ALLOWED_FLAGS = /^[gimsuy]*$/;
+                if (rule.flags && !ALLOWED_FLAGS.test(rule.flags)) {
+                    throw new Error(`Invalid regex flags: ${rule.flags}`);
+                }
                 try {
                     new RegExp(rule.pattern, rule.flags || '');
                 }
                 catch (e) {
-                    throw new Error(`Invalid regex pattern: ${rule.pattern}`);
+                    throw new Error(`Invalid regex pattern syntax: ${rule.pattern}`);
                 }
                 break;
             case 'line_range':

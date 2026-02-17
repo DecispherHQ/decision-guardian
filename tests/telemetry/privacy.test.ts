@@ -38,4 +38,14 @@ describe('validatePrivacy', () => {
             })
         ).toThrow(/repo_name/);
     });
+
+    it('should be case-insensitive and block mixed-case fields', () => {
+        expect(() =>
+            validatePrivacy({
+                event: 'run_complete',
+                Repo_Name: 'secret-repo',
+            })
+        ).toThrow(/Repo_Name/i);
+    });
 });
+

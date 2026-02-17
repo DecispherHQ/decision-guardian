@@ -87,11 +87,14 @@ class RuleEvaluator {
                     nocase: false,
                 });
                 if (matches && rule.exclude) {
-                    return !(0, minimatch_1.minimatch)(file.filename, rule.exclude, {
+                    // Handle both string and string[] exclude patterns
+                    const excludePatterns = Array.isArray(rule.exclude) ? rule.exclude : [rule.exclude];
+                    const isExcluded = excludePatterns.some((pattern) => (0, minimatch_1.minimatch)(file.filename, pattern, {
                         dot: true,
                         matchBase: false,
                         nocase: false,
-                    });
+                    }));
+                    return !isExcluded;
                 }
                 return matches;
             });

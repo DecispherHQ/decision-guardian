@@ -1,5 +1,6 @@
 export interface Env {
     TELEMETRY_KV: KVNamespace;
+    STATS_SECRET: string;
 }
 
 interface TelemetryEvent {
@@ -36,7 +37,7 @@ export default {
         }
 
         if (url.pathname === '/stats' && request.method === 'GET') {
-            return handleStats(env);
+            return handleStats(request, env);
         }
 
         return corsResponse(404, { error: 'Not found' });
@@ -44,6 +45,11 @@ export default {
 };
 
 async function handleCollect(request: Request, env: Env): Promise<Response> {
+    const contentLength = request.headers.get('content-length');
+    if (contentLength && parseInt(contentLength) > 10240) {
+        return corsResponse(413, { error: 'Payload too large' });
+    }
+
     try {
         const body = (await request.json()) as TelemetryEvent;
 
@@ -78,7 +84,12 @@ async function handleCollect(request: Request, env: Env): Promise<Response> {
     }
 }
 
-async function handleStats(env: Env): Promise<Response> {
+async function handleStats(request: Request, env: Env): Promise<Response> {
+    const authHeader = request.headers.get('X-Stats-Key');
+    if (authHeader !== env.STATS_SECRET) {
+        return corsResponse(401, { error: 'Unauthorized' });
+    }
+
     const keys = await env.TELEMETRY_KV.list({ prefix: 'events:' });
     const results: DailyAggregate[] = [];
 

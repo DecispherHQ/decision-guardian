@@ -87,6 +87,11 @@ export async function runCheck(opts: CheckOptions): Promise<void> {
         metrics.setDuration(Date.now() - startTime);
 
         const grouped = matcher.groupBySeverity(matches);
+
+        metrics.addCriticalMatches(grouped.critical.length);
+        metrics.addWarningMatches(grouped.warning.length);
+        metrics.addInfoMatches(grouped.info.length);
+
         console.log(formatMatchesTable(matches));
 
         const snapshot = metrics.getSnapshot();

@@ -1,5 +1,6 @@
 import * as github from '@actions/github';
 import * as path from 'path';
+import * as fs from 'fs';
 import { DecisionParser } from './core/parser';
 import { FileMatcher } from './core/matcher';
 import { ActionConfig, DecisionMatch, Decision } from './core/types';
@@ -22,10 +23,11 @@ const logger = new ActionsLogger();
 async function run(): Promise<void> {
   const startTime = Date.now();
   const errors: string[] = [];
+  let config: ActionConfig | undefined;
 
   try {
     // 1. Load configuration
-    const config = loadConfig();
+    config = loadConfig();
 
     // 2. Health checks
     const decisionFileOk = await checkDecisionFileExists(config.decisionFile);
@@ -41,7 +43,12 @@ async function run(): Promise<void> {
     // 3. Parse decisions
     logger.startGroup('Parsing decisions...');
     const parser = new DecisionParser();
-    const parseResult = await parser.parseFile(config.decisionFile);
+
+    // Check if path is a directory and handle accordingly
+    const isDir = fs.existsSync(config.decisionFile) && fs.statSync(config.decisionFile).isDirectory();
+    const parseResult = isDir
+      ? await parser.parseDirectory(config.decisionFile)
+      : await parser.parseFile(config.decisionFile);
 
     if (parseResult.warnings.length > 0) {
       parseResult.warnings.forEach((warn) => {
@@ -74,7 +81,10 @@ async function run(): Promise<void> {
     const changedFiles = await provider.getChangedFiles();
     const useStreaming = changedFiles.length > 1000;
 
-    let matches: DecisionMatch[];
+    // Create FileMatcher once for all code paths
+    const matcher = new FileMatcher(parseResult.decisions, logger);
+
+    let matches: DecisionMatch[] = [];
     let processedFileCount = 0;
 
     if (useStreaming) {
@@ -100,7 +110,7 @@ async function run(): Promise<void> {
           duration_ms: Date.now() - startTime,
         });
         metrics.setDuration(Date.now() - startTime);
-        reportMetrics();
+        reportMetrics(config);
         return;
       }
 
@@ -108,7 +118,6 @@ async function run(): Promise<void> {
 
       // 5. Match files to decisions
       logger.startGroup('Matching decisions...');
-      const matcher = new FileMatcher(parseResult.decisions, logger);
 
       try {
         matches = await matcher.findMatchesWithDiffs(fileDiffs);
@@ -119,10 +128,12 @@ async function run(): Promise<void> {
       }
     }
 
-    const matcher = new FileMatcher(parseResult.decisions, logger);
     const grouped = matcher.groupBySeverity(matches);
 
     metrics.addMatchesFound(matches.length);
+    metrics.addCriticalMatches(grouped.critical.length);
+    metrics.addWarningMatches(grouped.warning.length);
+    metrics.addInfoMatches(grouped.info.length);
 
     logger.info(`Found ${matches.length} matches:`);
     logger.info(`  - Critical: ${grouped.critical.length}`);
@@ -149,19 +160,13 @@ async function run(): Promise<void> {
         });
         logger.setFailed(failureMessage);
         metrics.setDuration(Date.now() - startTime);
-        reportMetrics();
+        reportMetrics(config);
         return;
       }
     } else {
       logger.info('No decision matches found - PR is clear!');
       logger.setOutput('matches_found', '0');
       logger.setOutput('critical_count', '0');
-    }
-
-    if (config.telemetryEnabled) {
-      logger.info(
-        `Telemetry: Decision Guardian run completed. Matches: ${matches.length}, Critical: ${grouped.critical.length}`,
-      );
     }
 
     const duration = Date.now() - startTime;
@@ -174,7 +179,7 @@ async function run(): Promise<void> {
     });
 
     metrics.setDuration(duration);
-    reportMetrics();
+    reportMetrics(config);
 
     logger.info('✅ Decision Guardian completed successfully');
   } catch (error: unknown) {
@@ -194,7 +199,10 @@ async function run(): Promise<void> {
     }
 
     metrics.setDuration(Date.now() - startTime);
-    reportMetrics();
+    // Send telemetry only if config was loaded successfully
+    if (config) {
+      reportMetrics(config);
+    }
   }
 }
 
@@ -249,7 +257,7 @@ function loadConfig(): ActionConfig {
 /**
  * Report metrics using the decoupled snapshot approach
  */
-function reportMetrics(): void {
+function reportMetrics(config: ActionConfig): void {
   const snapshot = metrics.getSnapshot();
 
   logger.info('=== Performance Metrics ===');
@@ -263,7 +271,10 @@ function reportMetrics(): void {
 
   logger.setOutput('metrics', JSON.stringify(snapshot));
 
-  sendTelemetry('action', snapshot, VERSION).catch(() => { });
+  // Send telemetry only if enabled (GitHub Action control)
+  if (config.telemetryEnabled) {
+    sendTelemetry('action', snapshot, VERSION).catch(() => { });
+  }
 }
 
 /**

@@ -68,9 +68,9 @@ class DecisionParser {
     async parseFile(filePath) {
         const workspaceRoot = process.env.GITHUB_WORKSPACE || process.cwd();
         const resolvedPath = path.resolve(workspaceRoot, filePath);
-        const normalizedWorkspace = path.normalize(workspaceRoot);
-        if (!resolvedPath.startsWith(normalizedWorkspace + path.sep) &&
-            resolvedPath !== normalizedWorkspace) {
+        const relativePath = path.relative(workspaceRoot, resolvedPath);
+        const isSafe = relativePath === '' || (!relativePath.startsWith('..') && !path.isAbsolute(relativePath));
+        if (!isSafe) {
             return {
                 decisions: [],
                 errors: [
@@ -206,7 +206,7 @@ class DecisionParser {
             const blockContent = content.substring(start, end);
             blocks.push({
                 raw: blockContent,
-                lineNumber: this.computeLineStart(content, blockContent),
+                lineNumber: this.computeLineStart(content, start),
             });
         }
         return blocks;
@@ -214,11 +214,8 @@ class DecisionParser {
     /**
      * Compute the line number where a block starts
      */
-    computeLineStart(fullContent, blockContent) {
-        const index = fullContent.indexOf(blockContent);
-        if (index === -1)
-            return 1;
-        const before = fullContent.substring(0, index);
+    computeLineStart(fullContent, startIndex) {
+        const before = fullContent.substring(0, startIndex);
         return before.split(/\r?\n/).length;
     }
     /**

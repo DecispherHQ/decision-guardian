@@ -112,11 +112,16 @@ export class RuleEvaluator {
                 });
 
                 if (matches && rule.exclude) {
-                    return !minimatch(file.filename, rule.exclude, {
-                        dot: true,
-                        matchBase: false,
-                        nocase: false,
-                    });
+                    // Handle both string and string[] exclude patterns
+                    const excludePatterns = Array.isArray(rule.exclude) ? rule.exclude : [rule.exclude];
+                    const isExcluded = excludePatterns.some((pattern) =>
+                        minimatch(file.filename, pattern, {
+                            dot: true,
+                            matchBase: false,
+                            nocase: false,
+                        }),
+                    );
+                    return !isExcluded;
                 }
 
                 return matches;
