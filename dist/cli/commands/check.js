@@ -70,6 +70,10 @@ async function runCheck(opts) {
         }
         if (parseResult.errors.length > 0) {
             parseResult.errors.forEach(e => logger.error(`Line ${e.line}: ${e.message}`));
+            if (opts.failOnError) {
+                logger.error(`Check failed: ${parseResult.errors.length} parse errors found (fail-on-error enabled)`);
+                process.exit(1);
+            }
         }
         if (parseResult.decisions.length === 0) {
             logger.warning('No decisions found in the specified path.');

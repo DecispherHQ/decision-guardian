@@ -28,6 +28,7 @@ class FileMatcher {
      */
     async findMatchesWithDiffs(fileDiffs) {
         const activeDecisions = this.normalizedDecisions.filter((d) => d.status === 'active');
+        this.logger.debug(`FileMatcher: ${activeDecisions.length} active decisions loaded.`);
         metrics_1.metrics.addDecisionsEvaluated(activeDecisions.length);
         const matches = [];
         const ruleDecisions = activeDecisions.filter((d) => d.rules);

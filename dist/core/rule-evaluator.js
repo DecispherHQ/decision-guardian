@@ -99,6 +99,7 @@ class RuleEvaluator {
                 return matches;
             });
             if (matchingFiles.length === 0) {
+                this.logger.debug(`RuleEvaluator: No files matched pattern '${rule.pattern}'`);
                 return {
                     matched: false,
                     matchedPatterns: [],
@@ -107,6 +108,7 @@ class RuleEvaluator {
                 };
             }
             if (!rule.content_rules || rule.content_rules.length === 0) {
+                this.logger.debug(`RuleEvaluator: File '${rule.pattern}' matched ${matchingFiles.length} files: ${matchingFiles.map(f => f.filename).join(', ')}`);
                 return {
                     matched: true,
                     matchedPatterns: [rule.pattern],
@@ -114,6 +116,7 @@ class RuleEvaluator {
                     ruleDepth: depth,
                 };
             }
+            this.logger.debug(`RuleEvaluator: File '${rule.pattern}' matched ${matchingFiles.length} files, checking content rules...`);
             const allMatchedPatterns = [];
             const allMatchedFiles = [];
             for (const file of matchingFiles) {

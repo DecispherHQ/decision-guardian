@@ -223,7 +223,7 @@ export class DecisionParser {
         const idMatch = content.match(/<!--\s*(DECISION-(?:[A-Z0-9]+-)*[A-Z0-9]+)\s*-->/i);
         const id = idMatch ? idMatch[1].toUpperCase() : '';
 
-        const titleMatch = content.match(/##\s*Decision:\s*(.+)/i);
+        const titleMatch = content.match(/^##\s*Decision:\s*(.+)$/im);
         const title = titleMatch ? titleMatch[1].trim() : '';
 
         const statusRaw = this.extractField(content, 'Status', 'active');
