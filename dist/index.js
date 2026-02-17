@@ -38140,14 +38140,26 @@ class CommentManager {
     }
     async findExistingComments(owner, repo, issue_number) {
         try {
-            const { data: comments } = await this.octokit.rest.issues.listComments({
-                owner,
-                repo,
-                issue_number,
-            });
-            return comments
-                .filter((c) => c.body?.includes(this.MARKER))
-                .map((c) => ({ id: c.id, body: c.body || '' }));
+            const found = [];
+            let page = 1;
+            const MAX_PAGES = 100; // Prevent infinite loops (10,000 comments max)
+            while (page <= MAX_PAGES) {
+                const { data } = await this.octokit.rest.issues.listComments({
+                    owner,
+                    repo,
+                    issue_number,
+                    per_page: 100,
+                    page,
+                });
+                const matches = data
+                    .filter((c) => c.body?.includes(this.MARKER))
+                    .map((c) => ({ id: c.id, body: c.body || '' }));
+                found.push(...matches);
+                if (data.length < 100)
+                    break;
+                page++;
+            }
+            return found;
         }
         catch (error) {
             this.logger.warning('Failed to fetch existing comments, will create new');
@@ -38353,7 +38365,10 @@ class CommentManager {
     }
     formatMatch(match) {
         const escapeMarkdown = (str) => {
-            return str.replace(/[\\`*_{}[\]()#+\-.!]/g, '\\$&');
+            return str
+                .replace(/[\\`*_{}[\]()#+\-.!]/g, '\\$&')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
         };
         const { file, decision, matchedPattern, matchDetails } = match;
         let patternDisplay = matchedPattern;
@@ -38523,7 +38538,7 @@ class GitHubProvider {
             page++;
         }
         if (page > MAX_PAGES) {
-            this.logger.warning('PR has 3000+ files - only checking first 3000');
+            throw new Error('PR too large for automatic verification');
         }
         return files;
     }
@@ -38583,7 +38598,7 @@ class GitHubProvider {
             page++;
         }
         if (page > MAX_PAGES) {
-            this.logger.warning('PR has 3000+ files - only checking first 3000');
+            throw new Error('PR too large for automatic verification');
         }
         return Array.from(fileMap.values());
     }
@@ -38615,6 +38630,9 @@ class GitHubProvider {
             if (data.length < 100)
                 break;
             page++;
+        }
+        if (page > MAX_PAGES) {
+            throw new Error('PR too large for automatic verification');
         }
     }
     /**
@@ -38651,12 +38669,19 @@ class GitHubProvider {
                     throw error;
                 }
                 let waitMs = 60000;
+                let calculated = false;
                 if (err.response?.headers['x-ratelimit-reset']) {
-                    const resetTime = parseInt(err.response.headers['x-ratelimit-reset'], 10) * 1000;
-                    waitMs = Math.max(resetTime - Date.now() + 1000, 1000);
+                    const resetEpoch = parseInt(err.response.headers['x-ratelimit-reset'], 10);
+                    if (!isNaN(resetEpoch)) {
+                        waitMs = Math.max(resetEpoch * 1000 - Date.now() + 1000, 1000);
+                        calculated = true;
+                    }
                 }
-                else if (err.response?.headers['retry-after']) {
-                    waitMs = parseInt(err.response.headers['retry-after'], 10) * 1000;
+                if (!calculated && err.response?.headers['retry-after']) {
+                    const retrySeconds = parseInt(err.response.headers['retry-after'], 10);
+                    if (!isNaN(retrySeconds)) {
+                        waitMs = retrySeconds * 1000;
+                    }
                 }
                 if (waitMs > MAX_WAIT_TIME_MS) {
                     this.logger.error(`Rate limit hit for ${description}. ` +
@@ -38825,6 +38850,13 @@ class ContentMatchers {
             });
             return { matched: false, matchedPatterns: [] };
         }
+        const ALLOWED_FLAGS = /^[gimsuy]*$/;
+        if (rule.flags && !ALLOWED_FLAGS.test(rule.flags)) {
+            (0, logger_1.logStructured)(this.logger, 'warning', `[Security] Invalid regex flags rejected`, {
+                flags: rule.flags,
+            });
+            return { matched: false, matchedPatterns: [] };
+        }
         const changedContent = this.getChangedLines(fileDiff.patch).join('\n');
         const MAX_CONTENT_SIZE = 1024 * 1024;
         if (changedContent.length > MAX_CONTENT_SIZE) {
@@ -38857,11 +38889,16 @@ class ContentMatchers {
             };
         }
         catch (error) {
+            const errorMessage = String(error);
             (0, logger_1.logStructured)(this.logger, 'warning', `Regex check failed for pattern`, {
                 pattern: rule.pattern,
-                error: String(error),
+                error: errorMessage,
             });
-            return { matched: false, matchedPatterns: [] };
+            // Fail closed: treat error/timeout as a match (security risk)
+            return {
+                matched: false,
+                matchedPatterns: [`Regex check failed: ${errorMessage}`]
+            };
         }
     }
     /**
@@ -38889,16 +38926,11 @@ class ContentMatchers {
             result = false;
         }
         `;
-        try {
-            vm_1.default.runInContext(code, context, {
-                timeout: timeoutMs,
-                displayErrors: false,
-            });
-            return Boolean(sandbox.result);
-        }
-        catch (e) {
-            return false;
-        }
+        vm_1.default.runInContext(code, context, {
+            timeout: timeoutMs,
+            displayErrors: false,
+        });
+        return Boolean(sandbox.result);
     }
     /**
      * Match if changes occur within specified line range
@@ -38922,17 +38954,34 @@ class ContentMatchers {
     }
     /**
      * JSON path mode - check if specific JSON keys changed
+     *
+     * Improved heuristic: all keys in the dotted path must appear as
+     * `"key"\s*:` in the changed lines, and each subsequent key must
+     * appear at a line number >= the previous key's line number.
+     * This enforces hierarchical ordering without needing the full file.
      */
     matchJsonPath(rule, fileDiff) {
-        const changedLines = this.getChangedLines(fileDiff.patch).join('\n');
+        const changedLines = this.getChangedLinesWithNumbers(fileDiff.patch);
         const matchedPatterns = [];
-        for (const path of rule.paths || []) {
-            const key = path.split('.').pop() || path;
-            // still heuristic but avoids matching random string occurrences
-            const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            const keyRegex = new RegExp(`"${escapedKey}"\\s*:`);
-            if (keyRegex.test(changedLines)) {
-                matchedPatterns.push(path);
+        for (const jsonPath of rule.paths || []) {
+            const keys = jsonPath.split('.');
+            let minLine = -1;
+            let allKeysFound = true;
+            for (const key of keys) {
+                const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const keyRegex = new RegExp(`"${escapedKey}"\\s*:`);
+                // Find the first matching line at or after minLine
+                const match = changedLines.find((line) => line.lineNumber >= minLine && keyRegex.test(line.content));
+                if (match) {
+                    minLine = match.lineNumber;
+                }
+                else {
+                    allKeysFound = false;
+                    break;
+                }
+            }
+            if (allKeysFound) {
+                matchedPatterns.push(jsonPath);
             }
         }
         return {
@@ -38981,10 +39030,10 @@ ${patch}`;
             return lines;
         }
         catch (error) {
-            return patch
-                .split('\n')
-                .filter((line) => line.startsWith('+') && !line.startsWith('+++'))
-                .map((line) => line.substring(1));
+            (0, logger_1.logStructured)(this.logger, 'warning', `[Parsing] Failed to parse diff content`, {
+                error: String(error),
+            });
+            return [];
         }
     }
     /**
@@ -39012,32 +39061,45 @@ ${patch}`;
             return lineNumbers;
         }
         catch (error) {
-            return this.parseHunksManually(patch);
+            (0, logger_1.logStructured)(this.logger, 'warning', `[Parsing] Failed to parse diff line numbers`, {
+                error: String(error),
+            });
+            return [];
         }
     }
     /**
-     * Fallback manual hunk parsing for line numbers
+     * Extract changed lines with their line numbers using parse-diff
      */
-    parseHunksManually(patch) {
-        const lineNumbers = [];
-        const lines = patch.split('\n');
-        let currentLine = 0;
-        for (const line of lines) {
-            // Parse hunk headers: @@ -1,5 +1,6 @@
-            const hunkMatch = line.match(/^@@ -\d+,?\d* \+(\d+),?(\d*) @@/);
-            if (hunkMatch) {
-                currentLine = parseInt(hunkMatch[1]);
-                continue;
+    getChangedLinesWithNumbers(patch) {
+        if (!patch)
+            return [];
+        try {
+            const fullDiff = `diff --git a/file b/file
+--- a/file
++++ b/file
+${patch}`;
+            const parsed = (0, parse_diff_1.default)(fullDiff);
+            const lines = [];
+            for (const file of parsed) {
+                for (const chunk of file.chunks) {
+                    for (const change of chunk.changes) {
+                        if (change.type === 'add' && change.ln) {
+                            lines.push({
+                                content: change.content.substring(1),
+                                lineNumber: change.ln,
+                            });
+                        }
+                    }
+                }
             }
-            if (line.startsWith('+') && !line.startsWith('+++')) {
-                lineNumbers.push(currentLine);
-                currentLine++;
-            }
-            else if (!line.startsWith('-')) {
-                currentLine++;
-            }
+            return lines;
         }
-        return lineNumbers;
+        catch (error) {
+            (0, logger_1.logStructured)(this.logger, 'warning', `[Parsing] Failed to parse diff content with line numbers`, {
+                error: String(error),
+            });
+            return [];
+        }
     }
 }
 exports.ContentMatchers = ContentMatchers;
@@ -39167,6 +39229,7 @@ class FileMatcher {
      */
     async findMatchesWithDiffs(fileDiffs) {
         const activeDecisions = this.normalizedDecisions.filter((d) => d.status === 'active');
+        this.logger.debug(`FileMatcher: ${activeDecisions.length} active decisions loaded.`);
         metrics_1.metrics.addDecisionsEvaluated(activeDecisions.length);
         const matches = [];
         const ruleDecisions = activeDecisions.filter((d) => d.rules);
@@ -39491,9 +39554,9 @@ class DecisionParser {
     async parseFile(filePath) {
         const workspaceRoot = process.env.GITHUB_WORKSPACE || process.cwd();
         const resolvedPath = path.resolve(workspaceRoot, filePath);
-        const normalizedWorkspace = path.normalize(workspaceRoot);
-        if (!resolvedPath.startsWith(normalizedWorkspace + path.sep) &&
-            resolvedPath !== normalizedWorkspace) {
+        const relativePath = path.relative(workspaceRoot, resolvedPath);
+        const isSafe = relativePath === '' || (!relativePath.startsWith('..') && !path.isAbsolute(relativePath));
+        if (!isSafe) {
             return {
                 decisions: [],
                 errors: [
@@ -39648,7 +39711,7 @@ class DecisionParser {
         const content = block.raw;
         const idMatch = content.match(/<!--\s*(DECISION-(?:[A-Z0-9]+-)*[A-Z0-9]+)\s*-->/i);
         const id = idMatch ? idMatch[1].toUpperCase() : '';
-        const titleMatch = content.match(/##\s*Decision:\s*(.+)/i);
+        const titleMatch = content.match(/^##\s*Decision:\s*(.+)$/im);
         const title = titleMatch ? titleMatch[1].trim() : '';
         const statusRaw = this.extractField(content, 'Status', 'active');
         const date = this.extractField(content, 'Date', new Date().toISOString().split('T')[0]);
@@ -39856,15 +39919,19 @@ class RuleEvaluator {
                     nocase: false,
                 });
                 if (matches && rule.exclude) {
-                    return !(0, minimatch_1.minimatch)(file.filename, rule.exclude, {
+                    // Handle both string and string[] exclude patterns
+                    const excludePatterns = Array.isArray(rule.exclude) ? rule.exclude : [rule.exclude];
+                    const isExcluded = excludePatterns.some((pattern) => (0, minimatch_1.minimatch)(file.filename, pattern, {
                         dot: true,
                         matchBase: false,
                         nocase: false,
-                    });
+                    }));
+                    return !isExcluded;
                 }
                 return matches;
             });
             if (matchingFiles.length === 0) {
+                this.logger.debug(`RuleEvaluator: No files matched pattern '${rule.pattern}'`);
                 return {
                     matched: false,
                     matchedPatterns: [],
@@ -39873,6 +39940,7 @@ class RuleEvaluator {
                 };
             }
             if (!rule.content_rules || rule.content_rules.length === 0) {
+                this.logger.debug(`RuleEvaluator: File '${rule.pattern}' matched ${matchingFiles.length} files: ${matchingFiles.map(f => f.filename).join(', ')}`);
                 return {
                     matched: true,
                     matchedPatterns: [rule.pattern],
@@ -39880,6 +39948,7 @@ class RuleEvaluator {
                     ruleDepth: depth,
                 };
             }
+            this.logger.debug(`RuleEvaluator: File '${rule.pattern}' matched ${matchingFiles.length} files, checking content rules...`);
             const allMatchedPatterns = [];
             const allMatchedFiles = [];
             for (const file of matchingFiles) {
@@ -39989,12 +40058,16 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.RuleParser = void 0;
 /**
  * Rule Parser - Extracts JSON rules from markdown decision blocks
  */
 const fs = __importStar(__nccwpck_require__(1943));
+const safe_regex_1 = __importDefault(__nccwpck_require__(895));
 const path = __importStar(__nccwpck_require__(6928));
 const rule_types_1 = __nccwpck_require__(4829);
 class RuleParser {
@@ -40032,9 +40105,19 @@ class RuleParser {
                 // Resolve path relative to the decision file
                 const resolvedPath = path.resolve(sourceDir, relPath);
                 const normalizedWorkspace = path.normalize(workspaceRoot);
-                if (!resolvedPath.startsWith(normalizedWorkspace) &&
-                    !resolvedPath.includes('node_modules')) {
-                    // Path is outside workspace - future enhancement: add security warning
+                const normalizedPath = path.normalize(resolvedPath);
+                // Security check: Reject paths outside workspace (Path Traversal protection)
+                // We also strictly reject Windows-specific absolute paths (like C:\...) on non-Windows platforms
+                // to prevent them from being interpreted as relative filenames
+                const isWindowsSpecificAbsolute = path.win32.isAbsolute(relPath) && !path.posix.isAbsolute(relPath);
+                const isCrossPlatformAbsolute = process.platform !== 'win32' && isWindowsSpecificAbsolute;
+                if ((!resolvedPath.startsWith(normalizedWorkspace + path.sep) && resolvedPath !== normalizedWorkspace) || isCrossPlatformAbsolute) {
+                    return {
+                        rules: null,
+                        error: `Security Error: External rule file '${relPath}' resolves to a path outside the workspace. ` +
+                            `Only files within the workspace are allowed. ` +
+                            `Resolved: ${normalizedPath}, Workspace: ${normalizedWorkspace}`,
+                    };
                 }
                 const fileContent = await fs.readFile(resolvedPath, 'utf-8');
                 const parsed = JSON.parse(fileContent);
@@ -40099,22 +40182,38 @@ class RuleParser {
             throw new Error(`Invalid content rule mode: ${rule.mode}`);
         }
         switch (rule.mode) {
-            case 'string':
+            case 'string': {
                 if (!rule.patterns || !Array.isArray(rule.patterns)) {
                     throw new Error('String mode requires patterns array');
                 }
                 break;
-            case 'regex':
+            }
+            case 'regex': {
                 if (!rule.pattern) {
                     throw new Error('Regex mode requires pattern');
+                }
+                let isSafe;
+                try {
+                    isSafe = (0, safe_regex_1.default)(rule.pattern);
+                }
+                catch (e) {
+                    throw new Error(`Invalid regex pattern (safe-check failed): ${rule.pattern}`);
+                }
+                if (!isSafe) {
+                    throw new Error(`Unsafe regex pattern: ${rule.pattern}`);
+                }
+                const ALLOWED_FLAGS = /^[gimsuy]*$/;
+                if (rule.flags && !ALLOWED_FLAGS.test(rule.flags)) {
+                    throw new Error(`Invalid regex flags: ${rule.flags}`);
                 }
                 try {
                     new RegExp(rule.pattern, rule.flags || '');
                 }
                 catch (e) {
-                    throw new Error(`Invalid regex pattern: ${rule.pattern}`);
+                    throw new Error(`Invalid regex pattern syntax: ${rule.pattern}`);
                 }
                 break;
+            }
             case 'line_range':
                 if (typeof rule.start !== 'number' || typeof rule.end !== 'number') {
                     throw new Error('Line range mode requires start and end numbers');
@@ -40181,7 +40280,9 @@ class PatternTrie {
         this.root = this.createNode();
         for (const decision of decisions) {
             for (const pattern of decision.files) {
-                this.insert(pattern, decision);
+                if (!pattern.startsWith('!')) {
+                    this.insert(pattern, decision);
+                }
             }
         }
     }
@@ -40298,6 +40399,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 const github = __importStar(__nccwpck_require__(3228));
 const path = __importStar(__nccwpck_require__(6928));
+const fs = __importStar(__nccwpck_require__(9896));
 const parser_1 = __nccwpck_require__(5392);
 const matcher_1 = __nccwpck_require__(3005);
 const metrics_1 = __nccwpck_require__(3010);
@@ -40332,7 +40434,11 @@ async function run() {
         // 3. Parse decisions
         logger.startGroup('Parsing decisions...');
         const parser = new parser_1.DecisionParser();
-        const parseResult = await parser.parseFile(config.decisionFile);
+        // Check if path is a directory and handle accordingly
+        const isDir = fs.existsSync(config.decisionFile) && fs.statSync(config.decisionFile).isDirectory();
+        const parseResult = isDir
+            ? await parser.parseDirectory(config.decisionFile)
+            : await parser.parseFile(config.decisionFile);
         if (parseResult.warnings.length > 0) {
             parseResult.warnings.forEach((warn) => {
                 logger.warning(warn);
@@ -40356,7 +40462,9 @@ async function run() {
         const provider = new github_provider_1.GitHubProvider(config.token, logger);
         const changedFiles = await provider.getChangedFiles();
         const useStreaming = changedFiles.length > 1000;
-        let matches;
+        // Create FileMatcher once for all code paths
+        const matcher = new matcher_1.FileMatcher(parseResult.decisions, logger);
+        let matches = [];
         let processedFileCount = 0;
         if (useStreaming) {
             logger.info(`Large PR detected (${changedFiles.length} files), using streaming mode`);
@@ -40385,7 +40493,6 @@ async function run() {
             logger.endGroup();
             // 5. Match files to decisions
             logger.startGroup('Matching decisions...');
-            const matcher = new matcher_1.FileMatcher(parseResult.decisions, logger);
             try {
                 matches = await matcher.findMatchesWithDiffs(fileDiffs);
             }
@@ -40395,9 +40502,11 @@ async function run() {
                 matches = await matcher.findMatches(fileNames);
             }
         }
-        const matcher = new matcher_1.FileMatcher(parseResult.decisions, logger);
         const grouped = matcher.groupBySeverity(matches);
         metrics_1.metrics.addMatchesFound(matches.length);
+        metrics_1.metrics.addCriticalMatches(grouped.critical.length);
+        metrics_1.metrics.addWarningMatches(grouped.warning.length);
+        metrics_1.metrics.addInfoMatches(grouped.info.length);
         logger.info(`Found ${matches.length} matches:`);
         logger.info(`  - Critical: ${grouped.critical.length}`);
         logger.info(`  - Warning: ${grouped.warning.length}`);
@@ -40467,7 +40576,6 @@ const ConfigSchema = zod_1.z.object({
         .refine((val) => !val.includes('..'), 'Path traversal not allowed'),
     failOnCritical: zod_1.z.boolean(),
     failOnError: zod_1.z.boolean(),
-    telemetryEnabled: zod_1.z.boolean(),
     token: zod_1.z.string().min(1, 'Token cannot be empty'),
 });
 /**
@@ -40478,7 +40586,6 @@ function loadConfig() {
         decisionFile: logger.getInput('decision_file') || '.decispher/decisions.md',
         failOnCritical: logger.getBooleanInput('fail_on_critical'),
         failOnError: logger.getBooleanInput('fail_on_error'),
-        telemetryEnabled: logger.getBooleanInput('telemetry_enabled'),
         token: logger.getInput('token', true),
     };
     const result = ConfigSchema.safeParse(rawConfig);
@@ -40501,7 +40608,7 @@ function loadConfig() {
 /**
  * Report metrics using the decoupled snapshot approach
  */
-function reportMetrics(config) {
+function reportMetrics(_config) {
     const snapshot = metrics_1.metrics.getSnapshot();
     logger.info('=== Performance Metrics ===');
     logger.info(`API Calls: ${snapshot.api_calls}`);
@@ -40512,10 +40619,8 @@ function reportMetrics(config) {
     logger.info(`Matches Found: ${snapshot.matches_found}`);
     logger.info(`Duration: ${snapshot.duration_ms}ms`);
     logger.setOutput('metrics', JSON.stringify(snapshot));
-    // Send telemetry only if enabled (GitHub Action control)
-    if (config.telemetryEnabled) {
-        (0, sender_1.sendTelemetry)('action', snapshot, version_1.VERSION).catch(() => { });
-    }
+    // Send telemetry (controlled by DG_TELEMETRY env variable)
+    (0, sender_1.sendTelemetry)('action', snapshot, version_1.VERSION).catch(() => { });
 }
 /**
  * Process large PRs using streaming
@@ -40630,17 +40735,21 @@ const payload_1 = __nccwpck_require__(9721);
 const privacy_1 = __nccwpck_require__(2755);
 const DEFAULT_ENDPOINT = 'https://decision-guardian-telemetry.iamalizaidi110.workers.dev/collect';
 const TIMEOUT_MS = 5000;
-function isOptedIn() {
+function isOptedIn(_source) {
+    // Unified telemetry control for both GitHub Actions and CLI via DG_TELEMETRY env
+    // Opt-out model: telemetry is enabled by default
+    // Users must explicitly set DG_TELEMETRY to '0' or 'false' to disable
     if (process.env.DG_TELEMETRY === '0' || process.env.DG_TELEMETRY === 'false') {
         return false;
     }
-    return process.env.DG_TELEMETRY === '1' || process.env.DG_TELEMETRY === 'true';
+    // Enabled by default if not set, or if set to '1' or 'true'
+    return true;
 }
 function getEndpoint() {
     return process.env.DG_TELEMETRY_URL || DEFAULT_ENDPOINT;
 }
 async function sendTelemetry(source, snapshot, version) {
-    if (!isOptedIn())
+    if (!isOptedIn(source))
         return;
     try {
         const payload = (0, payload_1.buildPayload)(source, snapshot, version);
