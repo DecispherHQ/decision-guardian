@@ -61,15 +61,25 @@ describe('sendTelemetry', () => {
         );
     });
 
-    it('should send for GitHub Action even when DG_TELEMETRY is not set', async () => {
-        delete process.env.DG_TELEMETRY;
+    it('should respect DG_TELEMETRY for GitHub Action when set to 1', async () => {
+        process.env.DG_TELEMETRY = '1';
         await sendTelemetry('action', snapshot, '1.0.0');
         expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
-    it('should send for GitHub Action even when DG_TELEMETRY is 0', async () => {
+    it('should respect DG_TELEMETRY for GitHub Action when set to 0', async () => {
         process.env.DG_TELEMETRY = '0';
         await sendTelemetry('action', snapshot, '1.0.0');
+        expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('should send for both action and cli when DG_TELEMETRY is true', async () => {
+        process.env.DG_TELEMETRY = 'true';
+        await sendTelemetry('action', snapshot, '1.0.0');
+        expect(mockFetch).toHaveBeenCalledTimes(1);
+        mockFetch.mockClear();
+
+        await sendTelemetry('cli', snapshot, '1.0.0');
         expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 

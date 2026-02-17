@@ -648,8 +648,9 @@ Prevents hardcoded credentials in source code.
     decision_file: '.decispher/decisions.md'
     fail_on_critical: true
     fail_on_error: false
-    telemetry_enabled: false
     token: ${{ secrets.GITHUB_TOKEN }}
+  env:
+    DG_TELEMETRY: '0'  # Optional: disable telemetry
 ```
 
 #### `decision_file`
@@ -721,26 +722,6 @@ Fail action if decision file has parse errors.
 ```yaml
 fail_on_error: true  # Strict mode
 ```
-
-#### `telemetry_enabled`
-
-**Type**: `boolean`  
-**Default**: `true`  
-**Required**: No
-
-Enable anonymous usage telemetry.
-
-**Collected** (when enabled):
-- Number of decisions processed
-- Number of matches found
-- Performance metrics
-- Error types (no sensitive data)
-
-**NOT collected**:
-- Repository names
-- File contents
-- Decision contents
-- User information
 
 #### `token`
 

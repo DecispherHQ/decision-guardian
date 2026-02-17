@@ -21,11 +21,6 @@ inputs:
     description: 'Fail the action if there are parse errors in the decision file'
     required: false
     default: 'false'
-    
-  telemetry_enabled:
-    description: 'Enable telemetry to help improve Decision Guardian (opt-out by setting to false)'
-    required: false
-    default: 'true'
   
   token:
     description: 'GitHub token for API access (use secrets.GITHUB_TOKEN)'

@@ -1723,8 +1723,9 @@ Configure Decision Guardian in your workflow file:
     decision_file: '.decispher/decisions.md'
     fail_on_critical: true
     fail_on_error: false
-    telemetry_enabled: false
     token: ${{ secrets.GITHUB_TOKEN }}
+  env:
+    DG_TELEMETRY: '0'  # Optional: disable telemetry
 ```
 
 #### `decision_file`
@@ -1822,28 +1823,6 @@ Parse errors include:
 - Invalid date formats
 
 When `false`: Warnings are logged but the action continues.
-
-#### `telemetry_enabled`
-
-**Type**: Boolean  
-**Default**: `true`  
-**Required**: No
-
-Enable telemetry logging to console (for future analytics features).
-
-**Currently**: When enabled, logs metrics to GitHub Actions console. No data is sent externally.
-
-**Data logged**:
-- Number of matches found
-- Number of critical matches
-- Execution metadata
-
-**Future**: May enable anonymous usage metrics to help improve Decision Guardian.
-
-```yaml
-telemetry_enabled: true
-```
-
 
 #### `token`
 
