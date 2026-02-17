@@ -55,9 +55,15 @@ Creates `.decispher/decisions.md` from the chosen template. Available templates:
 Print or save a template.
 
 ```bash
-decision-guardian template basic           # Print to stdout
-decision-guardian template security -o .   # Write to current dir
+decision-guardian template --list              # List available templates
+decision-guardian template basic               # Print to stdout
+decision-guardian template security --output . # Write to current dir
 ```
+
+| Flag | Short | Description |
+|------|-------|-------------|
+| `--list` | | List all template names |
+| `--output` | `-o` | Write to file instead of stdout |
 
 ## Exit Codes
 
@@ -70,7 +76,7 @@ decision-guardian template security -o .   # Write to current dir
 
 | Variable | Description |
 |----------|-------------|
-| `DG_TELEMETRY` | Set to `1` to opt into anonymous usage telemetry |
+| `DG_TELEMETRY` | Set to `0` or `false` to disable (opt-out of anonymous usage telemetry) |
 | `DG_TELEMETRY_URL` | Override telemetry endpoint |
 
 ## CI/CD Integration

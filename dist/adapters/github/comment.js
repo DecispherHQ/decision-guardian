@@ -163,7 +163,8 @@ class CommentManager {
         try {
             const found = [];
             let page = 1;
-            while (true) {
+            const MAX_PAGES = 100; // Prevent infinite loops (10,000 comments max)
+            while (page <= MAX_PAGES) {
                 const { data } = await this.octokit.rest.issues.listComments({
                     owner,
                     repo,

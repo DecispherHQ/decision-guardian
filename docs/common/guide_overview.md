@@ -495,7 +495,7 @@ Match exact strings in changed lines:
 }
 ```
 
-**Use case**: Config files where only specific keys matter.
+**Use case**: Config files where structural changes matter (enforces hierarchical order).
 
 ### Boolean Logic
 
@@ -1448,7 +1448,7 @@ A: Yes. Use path-specific patterns.
 A: Yes. Uses `GITHUB_TOKEN`.
 
 **Q: Other CI/CD platforms?**  
-A: GitHub Actions only (for now).
+A: The CLI works with all CI systems (GitLab, Jenkins, etc.). Native PR commenting is currently GitHub Actions only.
 
 **Q: Skip for specific PRs?**  
 A: Add label condition:

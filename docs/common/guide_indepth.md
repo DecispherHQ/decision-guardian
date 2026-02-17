@@ -355,7 +355,7 @@ decision-guardian check .decispher/decisions.md --fail-on-critical
 
 **What Gets Compared:**
 
-- `--staged` (default): Files in staging area (`git diff --cached HEAD`)
+- `--staged` (default): Files in staging area (`git diff --cached`)
 - `--branch <name>`: Difference between current branch and `<name>` (`git diff <name>...HEAD`)
 - `--all`: All uncommitted changes (`git diff HEAD`)
 
@@ -435,11 +435,15 @@ Print or save a decision file template.
 **Syntax:**
 ```bash
 decision-guardian template <template-name> [--output <path>]
+decision-guardian template --list
 ```
 
 **Examples:**
 
 ```bash
+# List available templates
+decision-guardian template --list
+
 # Print to stdout
 decision-guardian template security
 
@@ -449,6 +453,14 @@ decision-guardian template security --output .decispher/security.md
 # Save to current directory
 decision-guardian template api -o .
 ```
+
+**Flags:**
+
+| Flag | Type | Description |
+|------|------|-------------|
+| `--list` | boolean | List all available templates |
+| `--output`, `-o` | string | Write template to file instead of stdout |
+
 
 ### Comparison Modes Explained
 
@@ -463,7 +475,7 @@ Understanding when to use each comparison mode:
 
 **Git command equivalent:**
 ```bash
-git diff --cached HEAD
+git diff --cached
 ```
 
 **Example workflow:**
@@ -903,7 +915,7 @@ Control CLI behavior via environment variables:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `DG_TELEMETRY` | Enable anonymous telemetry | `0` (disabled) |
+| `DG_TELEMETRY` | Control telemetry | `1` (enabled) |
 | `DG_TELEMETRY_URL` | Override telemetry endpoint | - |
 | `NODE_ENV` | Affects debug output | - |
 
@@ -924,6 +936,11 @@ decision-guardian checkall
 ## The Decisions File
 
 The decisions file is a Markdown document containing structured architectural decisions. By default, Decision Guardian looks for `.decispher/decisions.md`, but you can customize this location.
+
+### File Requirements
+
+- **Encoding**: The file **must be UTF-8 encoded**. Other encodings (like UTF-16 or Latin-1) may cause parse errors.
+- **Format**: Standard Markdown with HTML comments for metadata.
 
 ### File Structure
 
@@ -1114,14 +1131,7 @@ This decision is no longer enforced. See DECISION-NEW-002 for current guidance.
 ```
 
 
-## Decision: Legacy System
 
-**Status**: Deprecated  
-**Deprecated Date**: 2025-01-15
-**Superseded By**: DECISION-NEW-002
-
-This decision is no longer enforced. See DECISION-NEW-002 for current guidance.
-```
 
 This preserves history while preventing alerts.
 
@@ -1142,6 +1152,14 @@ This tracks when the decision was made. Decision Guardian will warn if:
 
 ```markdown
 **Severity**: Critical
+
+#### Schema Version (Internal)
+
+Decision Guardian internally tracks a schema version for every decision.
+
+- **Field**: `schemaVersion`
+- **Current Value**: `1` (Always)
+- **Purpose**: Future-proofing for potential schema changes. You generally don't need to specify this manually in Markdown; the parser assigns version 1 automatically.
 ```
 
 **Valid Values**:
@@ -1239,6 +1257,14 @@ Use advanced rules when you need to:
 - Match content within diffs (added/modified lines)
 - Exclude certain files from broad patterns
 - Create conditional logic (e.g., "if file X changes AND contains pattern Y")
+
+### Rules vs Files: Precedence
+
+**Important**: If a decision block contains a `**Rules**:` section, the legacy `**Files**:` section is **effectively ignored** for matching purposes, though it serves as documentation.
+
+- **Rules**: The source of truth for matching logic.
+- **Files**: Legacy simple pattern matching.
+- **Recommendation**: If using Advanced Rules, you can omit `Files:` or keep it purely for human readability.
 
 ### Basic Rule Structure
 
@@ -1490,7 +1516,7 @@ Match any change to the file:
 
 #### 5. JSON Path Mode (Experimental)
 
-Match changes to specific JSON keys:
+Match changes to specific JSON keys (heuristic with hierarchical ordering enforce):
 
 ```json
 {
@@ -1499,7 +1525,15 @@ Match changes to specific JSON keys:
 }
 ```
 
-**Use for**: Configuration files where only certain fields matter
+**How it works**:
+- Parses the diff to find changed lines
+- Verifies that ALL keys in the path appear in the changed lines
+- Enforces hierarchical order: each subsequent key must appear at a line number >= the previous key
+- **Example**: `config.server.port` matches only if `config`, `server`, and `port` all appear in the diff in that order.
+
+**Use for**: Configuration files where structural changes matter and you want to avoid matching random occurrences of common keys like "id" or "name".
+
+> **Note**: This mode is **Experimental**. It uses a lightweight heuristic (regex-based) to verify key presence and order without fully parsing the JSON/YAML content. This ensures compatibility with git diffs (which are often partial files) but may have edge cases. Use in production with the understanding that false positives are possible if keys appear in comments or strings.
 
 ### Complex Rule Logic
 
@@ -1925,6 +1959,62 @@ Duration: 4521ms
 
 ---
 
+## Telemetry & Data Privacy
+
+Decision Guardian includes optional telemetry to help improving the tool. We value your privacy and are transparent about what data is collected.
+
+### Data Collected
+
+We collect **anonymous** usage metrics only. We **NEVER** collect source code, file names, file contents, decision titles, or any sensitive project information.
+
+**The Payload:**
+See `src/telemetry/payload.ts` for the exact type definition.
+
+```typescript
+interface TelemetryPayload {
+    event: 'run_complete';
+    version: string;        // Tool version (e.g. "1.0.0")
+    source: 'action' | 'cli';
+    timestamp: string;      // ISO date
+    metrics: {
+        files_processed: number;      // Count only
+        decisions_evaluated: number;  // Count only
+        matches_found: number;        // Count only
+        critical_matches: number;     // Count only
+        warning_matches: number;      // Count only
+        info_matches: number;         // Count only
+        duration_ms: number;          // Execution time
+    };
+    environment: {
+        node_version: string;         // e.g. "v20.10.0"
+        os_platform: string;          // e.g. "linux", "win32"
+        ci: boolean;                  // true/false
+    };
+}
+```
+
+### Telemetry Endpoint
+
+Data is sent to our Cloudflare Worker endpoint:
+`https://decision-guardian-telemetry.iamalizaidi110.workers.dev/collect`
+
+### Privacy Policy
+
+For more details on how we handle data, please refer to:
+- [TELEMETRY.md](../../TELEMETRY.md) - Technical details
+- [PRIVACY.md](../../PRIVACY.md) - Privacy policy
+
+### Opting Out
+
+You can disable telemetry at any time by setting the `DG_TELEMETRY` environment variable to `0` or `false`.
+
+```yaml
+env:
+  DG_TELEMETRY: '0'
+```
+
+---
+
 ## Use Cases & Examples
 
 ### Example 1: Database Migration Safety
@@ -2296,6 +2386,18 @@ Common fixes:
 2. Re-run the workflow
 3. For chronic issues, split large PRs into smaller ones
 
+#### Issue: Pattern Matching Not Working as Expected
+
+**Cause**: Glob patterns can be tricky.
+
+**Solution**:
+1. Use the `repro_minimatch.js` script included in the root of the repository to test your patterns against file paths locally.
+   ```bash
+   node repro_minimatch.js
+   # Edit the file to change 'file' and 'pattern' variables to test specific cases
+   ```
+2. Verify you are using forward slashes `/` even on Windows.
+
 #### Issue: No comment posted on PR
 
 **Possible causes**:
@@ -2399,8 +2501,14 @@ Decision Guardian minimizes API calls:
 
 ### Optimization Techniques Used
 
-1. **Pattern Trie**: O(1) candidate lookup instead of O(n×m) brute force
-2. **Caching**: Regex results cached to avoid re-evaluation
+### Optimization Techniques Used
+
+1.  **Pattern Trie (Aho-Corasick variant)**:
+    -   **Problem**: Matching N files against M patterns is normally O(N × M).
+    -   **Solution**: We compile all decision patterns into a Trie (Prefix Tree).
+    -   **Result**: Candidate lookup becomes **O(L)** where L is the length of the file path, effectively **O(1)** relative to the number of decisions. This allows Decision Guardian to scale to thousands of decisions with negligible performance impact.
+
+2.  **Caching**: Regex results cached to avoid re-evaluation
 3. **Parallel Processing**: Batch rule evaluation with Promise.allSettled
 4. **Streaming**: Memory-efficient processing for huge PRs
 5. **Early Termination**: Stop matching once enough context found
@@ -3461,7 +3569,7 @@ Wait time (8m) exceeds limit.
 
 #### Q: Does it support other CI/CD platforms?
 
-**A**: Currently, Decision Guardian is GitHub Actions only. GitLab CI and other platforms are on the roadmap.
+**A**: Yes! The Decision Guardian CLI works with all CI systems including GitLab CI, Jenkins, CircleCI, Azure DevOps, and Bitbucket. Ideally, you can run it as a step in your pipeline to check for violations. The native PR commenting feature is currently specific to GitHub Actions, but the CLI can be used to fail builds on critical violations anywhere.
 
 #### Q: How do I ignore Decision Guardian for specific PRs?
 
@@ -3524,8 +3632,7 @@ Quick reference:
 
 ### Example Repositories
 
-- [Decision Guardian Examples](https://github.com/decispher/examples) - Sample decisions for common scenarios
-- [Enterprise Template](https://github.com/decispher/enterprise-template) - Complete setup for large organizations
+- [Decision Guardian Examples](https://github.com/DecispherHQ/decision-guardian/tree/main/samples) - Sample decisions for common scenarios
 
 ### Community
 
@@ -3575,6 +3682,15 @@ Decision Guardian is MIT licensed. Free for commercial and personal use.
 ---
 
 ## Changelog
+
+### v1.1.0 (2025-02-17)
+
+**Enhancements & Fixes**
+
+- Improved JSON path matching heuristic
+- Added `--list` and `--output` flags to `template` command
+- Security: Recursive file limit, regex validation, and rate limiting
+- Telemetry: Now enabled by default (opt-out with `DG_TELEMETRY=0`)
 
 ### v1.0.0 (2025-01-15)
 

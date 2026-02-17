@@ -341,7 +341,7 @@ For complex scenarios, use JSON-based rules:
 - `regex` - Pattern matching (5s timeout, ReDoS-protected)
 - `line_range` - Specific line numbers
 - `full_file` - Any change
-- `json_path` - Target JSON keys
+- `json_path` - Target JSON keys (hierarchical match)
 
 **Boolean Logic**:
 ```json

@@ -39,6 +39,10 @@ Check flags:
 Template names:
   basic, advanced-rules, security, database, api
 
+Template flags:
+  --list              List all available templates
+  --output, -o <path> Write template to file instead of stdout
+
 Global flags:
   --help, -h          Show this help
   --version, -v       Show version

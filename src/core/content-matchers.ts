@@ -112,7 +112,7 @@ export class ContentMatchers {
             });
             // Fail closed: treat error/timeout as a match (security risk)
             return {
-                matched: true,
+                matched: false,
                 matchedPatterns: [`Regex check failed: ${errorMessage}`]
             };
         }
@@ -179,19 +179,40 @@ export class ContentMatchers {
 
     /**
      * JSON path mode - check if specific JSON keys changed
+     *
+     * Improved heuristic: all keys in the dotted path must appear as
+     * `"key"\s*:` in the changed lines, and each subsequent key must
+     * appear at a line number >= the previous key's line number.
+     * This enforces hierarchical ordering without needing the full file.
      */
     matchJsonPath(rule: ContentRule, fileDiff: FileDiff): { matched: boolean; matchedPatterns: string[] } {
-        const changedLines = this.getChangedLines(fileDiff.patch).join('\n');
+        const changedLines = this.getChangedLinesWithNumbers(fileDiff.patch);
         const matchedPatterns: string[] = [];
 
-        for (const path of rule.paths || []) {
-            const key = path.split('.').pop() || path;
-            // still heuristic but avoids matching random string occurrences
-            const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            const keyRegex = new RegExp(`"${escapedKey}"\\s*:`);
+        for (const jsonPath of rule.paths || []) {
+            const keys = jsonPath.split('.');
+            let minLine = -1;
+            let allKeysFound = true;
 
-            if (keyRegex.test(changedLines)) {
-                matchedPatterns.push(path);
+            for (const key of keys) {
+                const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const keyRegex = new RegExp(`"${escapedKey}"\\s*:`);
+
+                // Find the first matching line at or after minLine
+                const match = changedLines.find(
+                    (line) => line.lineNumber >= minLine && keyRegex.test(line.content),
+                );
+
+                if (match) {
+                    minLine = match.lineNumber;
+                } else {
+                    allKeysFound = false;
+                    break;
+                }
+            }
+
+            if (allKeysFound) {
+                matchedPatterns.push(jsonPath);
             }
         }
 
@@ -281,6 +302,43 @@ ${patch}`;
             return lineNumbers;
         } catch (error) {
             logStructured(this.logger, 'warning', `[Parsing] Failed to parse diff line numbers`, {
+                error: String(error),
+            });
+            return [];
+        }
+    }
+
+    /**
+     * Extract changed lines with their line numbers using parse-diff
+     */
+    private getChangedLinesWithNumbers(patch: string): { content: string; lineNumber: number }[] {
+        if (!patch) return [];
+
+        try {
+            const fullDiff = `diff --git a/file b/file
+--- a/file
++++ b/file
+${patch}`;
+
+            const parsed = parseDiff(fullDiff);
+            const lines: { content: string; lineNumber: number }[] = [];
+
+            for (const file of parsed) {
+                for (const chunk of file.chunks) {
+                    for (const change of chunk.changes as ParsedChange[]) {
+                        if (change.type === 'add' && change.ln) {
+                            lines.push({
+                                content: change.content.substring(1),
+                                lineNumber: change.ln,
+                            });
+                        }
+                    }
+                }
+            }
+
+            return lines;
+        } catch (error) {
+            logStructured(this.logger, 'warning', `[Parsing] Failed to parse diff content with line numbers`, {
                 error: String(error),
             });
             return [];

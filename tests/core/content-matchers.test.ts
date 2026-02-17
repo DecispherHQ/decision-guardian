@@ -96,4 +96,103 @@ context line
         expect(result.matched).toBe(true);
         expect(result.matchedPatterns).toContain('match_this');
     });
+
+    describe('matchJsonPath (improved heuristic)', () => {
+        const makeFileDiff = (): FileDiff => ({
+            filename: 'config.json',
+            patch: 'mocked',
+            additions: 5,
+            deletions: 0,
+            changes: 5,
+            status: 'modified',
+        });
+
+        it('should match when all keys in path appear in hierarchical line order', () => {
+            // Simulate: line 1 has "config", line 3 has "server", line 5 has "port"
+            (parseDiff as unknown as jest.Mock).mockReturnValue([
+                {
+                    chunks: [
+                        {
+                            changes: [
+                                { type: 'add', content: '+  "config": {', ln: 1 },
+                                { type: 'add', content: '+    "server": {', ln: 3 },
+                                { type: 'add', content: '+      "port": 8080', ln: 5 },
+                            ],
+                        },
+                    ],
+                },
+            ]);
+
+            const rule = { type: 'json_path', paths: ['config.server.port'] };
+            const result = matchers.matchJsonPath(rule as any, makeFileDiff());
+
+            expect(result.matched).toBe(true);
+            expect(result.matchedPatterns).toContain('config.server.port');
+        });
+
+        it('should NOT match when only the leaf key is present', () => {
+            // Only "port" appears — "config" and "server" are missing
+            (parseDiff as unknown as jest.Mock).mockReturnValue([
+                {
+                    chunks: [
+                        {
+                            changes: [
+                                { type: 'add', content: '+  "port": 3000', ln: 10 },
+                            ],
+                        },
+                    ],
+                },
+            ]);
+
+            const rule = { type: 'json_path', paths: ['config.server.port'] };
+            const result = matchers.matchJsonPath(rule as any, makeFileDiff());
+
+            expect(result.matched).toBe(false);
+            expect(result.matchedPatterns).toHaveLength(0);
+        });
+
+        it('should NOT match when keys appear in reverse line order', () => {
+            // "port" at line 1, "server" at line 3, "config" at line 5 — wrong order
+            (parseDiff as unknown as jest.Mock).mockReturnValue([
+                {
+                    chunks: [
+                        {
+                            changes: [
+                                { type: 'add', content: '+  "port": 8080', ln: 1 },
+                                { type: 'add', content: '+  "server": {', ln: 3 },
+                                { type: 'add', content: '+  "config": {', ln: 5 },
+                            ],
+                        },
+                    ],
+                },
+            ]);
+
+            const rule = { type: 'json_path', paths: ['config.server.port'] };
+            const result = matchers.matchJsonPath(rule as any, makeFileDiff());
+
+            // "config" found at line 5, but then "server" must be >= 5.
+            // "server" is at line 3 which is < 5, so it fails.
+            expect(result.matched).toBe(false);
+        });
+
+        it('should match a single-key path when the key is present', () => {
+            (parseDiff as unknown as jest.Mock).mockReturnValue([
+                {
+                    chunks: [
+                        {
+                            changes: [
+                                { type: 'add', content: '+  "version": "2.0.0"', ln: 1 },
+                            ],
+                        },
+                    ],
+                },
+            ]);
+
+            const rule = { type: 'json_path', paths: ['version'] };
+            const result = matchers.matchJsonPath(rule as any, makeFileDiff());
+
+            expect(result.matched).toBe(true);
+            expect(result.matchedPatterns).toContain('version');
+        });
+    });
 });
