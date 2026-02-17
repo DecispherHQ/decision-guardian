@@ -84,7 +84,7 @@ async function run(): Promise<void> {
     // Create FileMatcher once for all code paths
     const matcher = new FileMatcher(parseResult.decisions, logger);
 
-    let matches: DecisionMatch[];
+    let matches: DecisionMatch[] = [];
     let processedFileCount = 0;
 
     if (useStreaming) {
@@ -131,6 +131,9 @@ async function run(): Promise<void> {
     const grouped = matcher.groupBySeverity(matches);
 
     metrics.addMatchesFound(matches.length);
+    metrics.addCriticalMatches(grouped.critical.length);
+    metrics.addWarningMatches(grouped.warning.length);
+    metrics.addInfoMatches(grouped.info.length);
 
     logger.info(`Found ${matches.length} matches:`);
     logger.info(`  - Critical: ${grouped.critical.length}`);

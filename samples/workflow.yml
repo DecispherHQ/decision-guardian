@@ -24,7 +24,7 @@ jobs:
       
       # Step 2: Run Decision Guardian
       - name: Check decisions
-        uses: your-org/decision-guardian@v1
+        uses: DecispherHQ/decision-guardian@v1
         with:
           # Path to your decisions file (optional, this is the default)
           decision_file: '.decispher/decisions.md'

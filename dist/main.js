@@ -35,6 +35,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 const github = __importStar(require("@actions/github"));
 const path = __importStar(require("path"));
+const fs = __importStar(require("fs"));
 const parser_1 = require("./core/parser");
 const matcher_1 = require("./core/matcher");
 const metrics_1 = require("./core/metrics");
@@ -54,9 +55,10 @@ const logger = new actions_logger_1.ActionsLogger();
 async function run() {
     const startTime = Date.now();
     const errors = [];
+    let config;
     try {
         // 1. Load configuration
-        const config = loadConfig();
+        config = loadConfig();
         // 2. Health checks
         const decisionFileOk = await (0, health_1.checkDecisionFileExists)(config.decisionFile);
         const tokenOk = await (0, health_2.validateToken)(config.token, logger);
@@ -68,7 +70,11 @@ async function run() {
         // 3. Parse decisions
         logger.startGroup('Parsing decisions...');
         const parser = new parser_1.DecisionParser();
-        const parseResult = await parser.parseFile(config.decisionFile);
+        // Check if path is a directory and handle accordingly
+        const isDir = fs.existsSync(config.decisionFile) && fs.statSync(config.decisionFile).isDirectory();
+        const parseResult = isDir
+            ? await parser.parseDirectory(config.decisionFile)
+            : await parser.parseFile(config.decisionFile);
         if (parseResult.warnings.length > 0) {
             parseResult.warnings.forEach((warn) => {
                 logger.warning(warn);
@@ -92,7 +98,9 @@ async function run() {
         const provider = new github_provider_1.GitHubProvider(config.token, logger);
         const changedFiles = await provider.getChangedFiles();
         const useStreaming = changedFiles.length > 1000;
-        let matches;
+        // Create FileMatcher once for all code paths
+        const matcher = new matcher_1.FileMatcher(parseResult.decisions, logger);
+        let matches = [];
         let processedFileCount = 0;
         if (useStreaming) {
             logger.info(`Large PR detected (${changedFiles.length} files), using streaming mode`);
@@ -115,13 +123,12 @@ async function run() {
                     duration_ms: Date.now() - startTime,
                 });
                 metrics_1.metrics.setDuration(Date.now() - startTime);
-                reportMetrics();
+                reportMetrics(config);
                 return;
             }
             logger.endGroup();
             // 5. Match files to decisions
             logger.startGroup('Matching decisions...');
-            const matcher = new matcher_1.FileMatcher(parseResult.decisions, logger);
             try {
                 matches = await matcher.findMatchesWithDiffs(fileDiffs);
             }
@@ -131,9 +138,11 @@ async function run() {
                 matches = await matcher.findMatches(fileNames);
             }
         }
-        const matcher = new matcher_1.FileMatcher(parseResult.decisions, logger);
         const grouped = matcher.groupBySeverity(matches);
         metrics_1.metrics.addMatchesFound(matches.length);
+        metrics_1.metrics.addCriticalMatches(grouped.critical.length);
+        metrics_1.metrics.addWarningMatches(grouped.warning.length);
+        metrics_1.metrics.addInfoMatches(grouped.info.length);
         logger.info(`Found ${matches.length} matches:`);
         logger.info(`  - Critical: ${grouped.critical.length}`);
         logger.info(`  - Warning: ${grouped.warning.length}`);
@@ -156,7 +165,7 @@ async function run() {
                 });
                 logger.setFailed(failureMessage);
                 metrics_1.metrics.setDuration(Date.now() - startTime);
-                reportMetrics();
+                reportMetrics(config);
                 return;
             }
         }
@@ -164,9 +173,6 @@ async function run() {
             logger.info('No decision matches found - PR is clear!');
             logger.setOutput('matches_found', '0');
             logger.setOutput('critical_count', '0');
-        }
-        if (config.telemetryEnabled) {
-            logger.info(`Telemetry: Decision Guardian run completed. Matches: ${matches.length}, Critical: ${grouped.critical.length}`);
         }
         const duration = Date.now() - startTime;
         (0, logger_1.logStructured)(logger, 'info', 'Decision Guardian completed successfully', {
@@ -177,7 +183,7 @@ async function run() {
             duration_ms: duration,
         });
         metrics_1.metrics.setDuration(duration);
-        reportMetrics();
+        reportMetrics(config);
         logger.info('✅ Decision Guardian completed successfully');
     }
     catch (error) {
@@ -193,7 +199,10 @@ async function run() {
             logger.debug(stack);
         }
         metrics_1.metrics.setDuration(Date.now() - startTime);
-        reportMetrics();
+        // Send telemetry only if config was loaded successfully
+        if (config) {
+            reportMetrics(config);
+        }
     }
 }
 const ConfigSchema = zod_1.z.object({
@@ -237,7 +246,7 @@ function loadConfig() {
 /**
  * Report metrics using the decoupled snapshot approach
  */
-function reportMetrics() {
+function reportMetrics(config) {
     const snapshot = metrics_1.metrics.getSnapshot();
     logger.info('=== Performance Metrics ===');
     logger.info(`API Calls: ${snapshot.api_calls}`);
@@ -248,7 +257,10 @@ function reportMetrics() {
     logger.info(`Matches Found: ${snapshot.matches_found}`);
     logger.info(`Duration: ${snapshot.duration_ms}ms`);
     logger.setOutput('metrics', JSON.stringify(snapshot));
-    (0, sender_1.sendTelemetry)('action', snapshot, version_1.VERSION).catch(() => { });
+    // Send telemetry only if enabled (GitHub Action control)
+    if (config.telemetryEnabled) {
+        (0, sender_1.sendTelemetry)('action', snapshot, version_1.VERSION).catch(() => { });
+    }
 }
 /**
  * Process large PRs using streaming

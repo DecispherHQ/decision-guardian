@@ -59,6 +59,14 @@ export class ContentMatchers {
             return { matched: false, matchedPatterns: [] };
         }
 
+        const ALLOWED_FLAGS = /^[gimsuy]*$/;
+        if (rule.flags && !ALLOWED_FLAGS.test(rule.flags)) {
+            logStructured(this.logger, 'warning', `[Security] Invalid regex flags rejected`, {
+                flags: rule.flags,
+            });
+            return { matched: false, matchedPatterns: [] };
+        }
+
         const changedContent = this.getChangedLines(fileDiff.patch).join('\n');
         const MAX_CONTENT_SIZE = 1024 * 1024;
 
@@ -97,11 +105,16 @@ export class ContentMatchers {
                 matchedPatterns: matched ? [rule.pattern!] : [],
             };
         } catch (error) {
+            const errorMessage = String(error);
             logStructured(this.logger, 'warning', `Regex check failed for pattern`, {
                 pattern: rule.pattern,
-                error: String(error),
+                error: errorMessage,
             });
-            return { matched: false, matchedPatterns: [] };
+            // Fail closed: treat error/timeout as a match (security risk)
+            return {
+                matched: true,
+                matchedPatterns: [`Regex check failed: ${errorMessage}`]
+            };
         }
     }
 
@@ -133,15 +146,11 @@ export class ContentMatchers {
         }
         `;
 
-        try {
-            vm.runInContext(code, context, {
-                timeout: timeoutMs,
-                displayErrors: false,
-            });
-            return Boolean(sandbox.result);
-        } catch (e) {
-            return false;
-        }
+        vm.runInContext(code, context, {
+            timeout: timeoutMs,
+            displayErrors: false,
+        });
+        return Boolean(sandbox.result);
     }
 
     /**
@@ -237,10 +246,10 @@ ${patch}`;
 
             return lines;
         } catch (error) {
-            return patch
-                .split('\n')
-                .filter((line) => line.startsWith('+') && !line.startsWith('+++'))
-                .map((line) => line.substring(1));
+            logStructured(this.logger, 'warning', `[Parsing] Failed to parse diff content`, {
+                error: String(error),
+            });
+            return [];
         }
     }
 
@@ -271,34 +280,12 @@ ${patch}`;
 
             return lineNumbers;
         } catch (error) {
-            return this.parseHunksManually(patch);
+            logStructured(this.logger, 'warning', `[Parsing] Failed to parse diff line numbers`, {
+                error: String(error),
+            });
+            return [];
         }
-    }
-
-    /**
-     * Fallback manual hunk parsing for line numbers
-     */
-    private parseHunksManually(patch: string): number[] {
-        const lineNumbers: number[] = [];
-        const lines = patch.split('\n');
-        let currentLine = 0;
-
-        for (const line of lines) {
-            // Parse hunk headers: @@ -1,5 +1,6 @@
-            const hunkMatch = line.match(/^@@ -\d+,?\d* \+(\d+),?(\d*) @@/);
-            if (hunkMatch) {
-                currentLine = parseInt(hunkMatch[1]);
-                continue;
-            }
-
-            if (line.startsWith('+') && !line.startsWith('+++')) {
-                lineNumbers.push(currentLine);
-                currentLine++;
-            } else if (!line.startsWith('-')) {
-                currentLine++;
-            }
-        }
-
-        return lineNumbers;
     }
 }
+
+

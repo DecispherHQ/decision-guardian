@@ -5,17 +5,25 @@ const payload_1 = require("./payload");
 const privacy_1 = require("./privacy");
 const DEFAULT_ENDPOINT = 'https://decision-guardian-telemetry.iamalizaidi110.workers.dev/collect';
 const TIMEOUT_MS = 5000;
-function isOptedIn() {
+function isOptedIn(source) {
+    // For GitHub Action: telemetry decision is already made via action.yml input
+    // If this function is called from the action, telemetry is enabled
+    if (source === 'action') {
+        return true;
+    }
+    // For CLI: telemetry is enabled by default (opt-out model)
+    // Users must explicitly set DG_TELEMETRY to '0' or 'false' to disable
     if (process.env.DG_TELEMETRY === '0' || process.env.DG_TELEMETRY === 'false') {
         return false;
     }
-    return process.env.DG_TELEMETRY === '1' || process.env.DG_TELEMETRY === 'true';
+    // Enabled by default if not set, or if set to '1' or 'true'
+    return true;
 }
 function getEndpoint() {
     return process.env.DG_TELEMETRY_URL || DEFAULT_ENDPOINT;
 }
 async function sendTelemetry(source, snapshot, version) {
-    if (!isOptedIn())
+    if (!isOptedIn(source))
         return;
     try {
         const payload = (0, payload_1.buildPayload)(source, snapshot, version);

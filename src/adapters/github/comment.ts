@@ -147,14 +147,29 @@ export class CommentManager {
         issue_number: number,
     ): Promise<{ id: number; body: string }[]> {
         try {
-            const { data: comments } = await this.octokit.rest.issues.listComments({
-                owner,
-                repo,
-                issue_number,
-            });
-            return comments
-                .filter((c) => c.body?.includes(this.MARKER))
-                .map((c) => ({ id: c.id, body: c.body || '' }));
+            const found: { id: number; body: string }[] = [];
+            let page = 1;
+
+            while (true) {
+                const { data } = await this.octokit.rest.issues.listComments({
+                    owner,
+                    repo,
+                    issue_number,
+                    per_page: 100,
+                    page,
+                });
+
+                const matches = data
+                    .filter((c) => c.body?.includes(this.MARKER))
+                    .map((c) => ({ id: c.id, body: c.body || '' }));
+
+                found.push(...matches);
+
+                if (data.length < 100) break;
+                page++;
+            }
+
+            return found;
         } catch (error) {
             this.logger.warning('Failed to fetch existing comments, will create new');
             return [];
@@ -429,7 +444,10 @@ export class CommentManager {
 
     private formatMatch(match: DecisionMatch): string {
         const escapeMarkdown = (str: string): string => {
-            return str.replace(/[\\`*_{}[\]()#+\-.!]/g, '\\$&');
+            return str
+                .replace(/[\\`*_{}[\]()#+\-.!]/g, '\\$&')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
         };
 
         const { file, decision, matchedPattern, matchDetails } = match;

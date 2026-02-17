@@ -37,12 +37,10 @@ export class DecisionParser {
     async parseFile(filePath: string): Promise<ParseResult> {
         const workspaceRoot = process.env.GITHUB_WORKSPACE || process.cwd();
         const resolvedPath = path.resolve(workspaceRoot, filePath);
-        const normalizedWorkspace = path.normalize(workspaceRoot);
+        const relativePath = path.relative(workspaceRoot, resolvedPath);
+        const isSafe = relativePath === '' || (!relativePath.startsWith('..') && !path.isAbsolute(relativePath));
 
-        if (
-            !resolvedPath.startsWith(normalizedWorkspace + path.sep) &&
-            resolvedPath !== normalizedWorkspace
-        ) {
+        if (!isSafe) {
             return {
                 decisions: [],
                 errors: [

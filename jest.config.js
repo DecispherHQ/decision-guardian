@@ -7,6 +7,7 @@ module.exports = {
     transform: {
         '^.+\\.ts$': ['ts-jest', {
             useESM: true,
+            isolatedModules: true,
         }],
     },
     extensionsToTreatAsEsm: ['.ts']

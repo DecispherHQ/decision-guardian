@@ -13,7 +13,9 @@ export class PatternTrie {
         this.root = this.createNode();
         for (const decision of decisions) {
             for (const pattern of decision.files) {
-                this.insert(pattern, decision);
+                if (!pattern.startsWith('!')) {
+                    this.insert(pattern, decision);
+                }
             }
         }
     }

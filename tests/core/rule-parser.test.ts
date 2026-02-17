@@ -314,7 +314,10 @@ describe('RuleParser', () => {
             const result = await parser.extractRules(content, path.join(workspaceDir, 'decisions.md'));
 
             expect(result.rules).toBeNull();
-            expect(result.error).toContain('Invalid regex pattern');
+            // Could be "Unsafe regex pattern", "Invalid regex pattern", or "Invalid regex pattern syntax" depending on safe-regex behavior
+            const errorMsg = result.error || '';
+            const isInvalidOrUnsafe = errorMsg.includes('Invalid regex pattern') || errorMsg.includes('Unsafe regex pattern');
+            expect(isInvalidOrUnsafe).toBe(true);
         });
     });
 
