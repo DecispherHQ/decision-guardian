@@ -91,14 +91,14 @@ jobs:
             exit 1
           fi
           
-      - name: Verify config file exists and has content
+      - name: Verify decisions file exists and has content
         run: |
-          if [ ! -f "/tmp/test-decispher/.decispher/config.yaml" ]; then
-            echo "Error: config.yaml not found"
+          if [ ! -f "/tmp/test-decispher/.decispher/decisions.md" ]; then
+            echo "Error: decisions.md not found"
             exit 1
           fi
-          if [ ! -s "/tmp/test-decispher/.decispher/config.yaml" ]; then
-            echo "Error: config.yaml is empty"
+          if [ ! -s "/tmp/test-decispher/.decispher/decisions.md" ]; then
+            echo "Error: decisions.md is empty"
             exit 1
           fi
           echo "✓ Templates are accessible after global install"
