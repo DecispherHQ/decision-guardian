@@ -108,7 +108,7 @@ class RuleEvaluator {
                 };
             }
             if (!rule.content_rules || rule.content_rules.length === 0) {
-                this.logger.debug(`RuleEvaluator: File '${rule.pattern}' matched ${matchingFiles.length} files: ${matchingFiles.map(f => f.filename).join(', ')}`);
+                this.logger.debug(`RuleEvaluator: File '${rule.pattern}' matched ${matchingFiles.length} files: ${matchingFiles.map((f) => f.filename).join(', ')}`);
                 return {
                     matched: true,
                     matchedPatterns: [rule.pattern],

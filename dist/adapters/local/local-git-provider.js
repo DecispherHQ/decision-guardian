@@ -31,9 +31,7 @@ class LocalGitProvider {
         // Only allow safe characters: alphanumeric, -, _, /, .
         // Reject shell metacharacters: ; & | $ ` \ " ' < > ( ) etc.
         // eslint-disable-next-line no-useless-escape
-        return /^[a-zA-Z0-9\-_.\/]+$/.test(name) &&
-            name.length > 0 &&
-            name.length < 256; // Reasonable length limit
+        return /^[a-zA-Z0-9\-_.\/]+$/.test(name) && name.length > 0 && name.length < 256; // Reasonable length limit
     }
     /**
      * Get list of changed file paths from git diff.
@@ -139,9 +137,11 @@ class LocalGitProvider {
             if (tabParts.length >= 3) {
                 const filenameRaw = tabParts.slice(2).join('\t');
                 const filename = this.normalizePath(filenameRaw);
-                const status = additions > 0 && deletions === 0 ? 'added' :
-                    additions === 0 && deletions > 0 ? 'removed' :
-                        'modified';
+                const status = additions > 0 && deletions === 0
+                    ? 'added'
+                    : additions === 0 && deletions > 0
+                        ? 'removed'
+                        : 'modified';
                 results.push({
                     filename,
                     status,
@@ -153,9 +153,9 @@ class LocalGitProvider {
             }
             // If we get here, the token did not include a filename -- filenames come in subsequent NUL-separated tokens.
             // Consume next NUL parts for old/new.
-            const next1 = (i < parts.length) ? parts[i++] : '';
+            const next1 = i < parts.length ? parts[i++] : '';
             // Peek to see if there's another token (rename case)
-            const peek = (i < parts.length) ? parts[i] : undefined;
+            const peek = i < parts.length ? parts[i] : undefined;
             let filename = '';
             let status = 'modified';
             if (peek !== undefined && peek !== '') {
@@ -167,9 +167,12 @@ class LocalGitProvider {
             else {
                 // Single following filename
                 filename = this.normalizePath(next1 || '');
-                status = additions > 0 && deletions === 0 ? 'added' :
-                    additions === 0 && deletions > 0 ? 'removed' :
-                        'modified';
+                status =
+                    additions > 0 && deletions === 0
+                        ? 'added'
+                        : additions === 0 && deletions > 0
+                            ? 'removed'
+                            : 'modified';
             }
             if (filename) {
                 results.push({

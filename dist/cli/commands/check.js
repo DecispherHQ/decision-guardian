@@ -66,10 +66,10 @@ async function runCheck(opts) {
             parseResult = await parser.parseFile(decisionPath);
         }
         if (parseResult.warnings.length > 0) {
-            parseResult.warnings.forEach(w => logger.warning(w));
+            parseResult.warnings.forEach((w) => logger.warning(w));
         }
         if (parseResult.errors.length > 0) {
-            parseResult.errors.forEach(e => logger.error(`Line ${e.line}: ${e.message}`));
+            parseResult.errors.forEach((e) => logger.error(`Line ${e.line}: ${e.message}`));
             if (opts.failOnError) {
                 logger.error(`Check failed: ${parseResult.errors.length} parse errors found (fail-on-error enabled)`);
                 process.exit(1);
@@ -99,7 +99,7 @@ async function runCheck(opts) {
             matches = await matcher.findMatchesWithDiffs(fileDiffs);
         }
         catch {
-            const fileNames = fileDiffs.map(f => f.filename);
+            const fileNames = fileDiffs.map((f) => f.filename);
             matches = await matcher.findMatches(fileNames);
         }
         metrics_1.metrics.addMatchesFound(matches.length);

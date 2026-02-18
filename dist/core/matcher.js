@@ -58,7 +58,9 @@ class FileMatcher {
                     const matchedPattern = this.matchesDecision(file, decision);
                     if (matchedPattern) {
                         matches.push({
-                            file, decision, matchedPattern,
+                            file,
+                            decision,
+                            matchedPattern,
                             matchDetails: {
                                 matched: true,
                                 matchedFiles: [file],
@@ -129,7 +131,7 @@ class FileMatcher {
             for (const decision of candidates) {
                 const matchedPattern = this.matchesDecision(normalizedFile, decision);
                 if (matchedPattern) {
-                    matches.push({ file: normalizedFile, decision, matchedPattern, });
+                    matches.push({ file: normalizedFile, decision, matchedPattern });
                 }
             }
         }

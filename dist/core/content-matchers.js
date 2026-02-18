@@ -125,7 +125,7 @@ class ContentMatchers {
             // Fail closed: treat error/timeout as a match (security risk)
             return {
                 matched: false,
-                matchedPatterns: [`Regex check failed: ${errorMessage}`]
+                matchedPatterns: [`Regex check failed: ${errorMessage}`],
             };
         }
     }

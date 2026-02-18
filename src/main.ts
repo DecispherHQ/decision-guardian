@@ -45,7 +45,8 @@ async function run(): Promise<void> {
     const parser = new DecisionParser();
 
     // Check if path is a directory and handle accordingly
-    const isDir = fs.existsSync(config.decisionFile) && fs.statSync(config.decisionFile).isDirectory();
+    const isDir =
+      fs.existsSync(config.decisionFile) && fs.statSync(config.decisionFile).isDirectory();
     const parseResult = isDir
       ? await parser.parseDirectory(config.decisionFile)
       : await parser.parseFile(config.decisionFile);
@@ -280,7 +281,7 @@ function reportMetrics(_config: ActionConfig): void {
   logger.setOutput('metrics', JSON.stringify(snapshot));
 
   // Send telemetry (controlled by DG_TELEMETRY env variable)
-  sendTelemetry('action', snapshot, VERSION).catch(() => { });
+  sendTelemetry('action', snapshot, VERSION).catch(() => {});
 }
 
 /**

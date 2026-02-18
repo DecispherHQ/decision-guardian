@@ -85,7 +85,9 @@ class RuleParser {
                 // to prevent them from being interpreted as relative filenames
                 const isWindowsSpecificAbsolute = path.win32.isAbsolute(relPath) && !path.posix.isAbsolute(relPath);
                 const isCrossPlatformAbsolute = process.platform !== 'win32' && isWindowsSpecificAbsolute;
-                if ((!resolvedPath.startsWith(normalizedWorkspace + path.sep) && resolvedPath !== normalizedWorkspace) || isCrossPlatformAbsolute) {
+                if ((!resolvedPath.startsWith(normalizedWorkspace + path.sep) &&
+                    resolvedPath !== normalizedWorkspace) ||
+                    isCrossPlatformAbsolute) {
                     return {
                         rules: null,
                         error: `Security Error: External rule file '${relPath}' resolves to a path outside the workspace. ` +

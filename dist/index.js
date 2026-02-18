@@ -39045,7 +39045,7 @@ class ContentMatchers {
             // Fail closed: treat error/timeout as a match (security risk)
             return {
                 matched: false,
-                matchedPatterns: [`Regex check failed: ${errorMessage}`]
+                matchedPatterns: [`Regex check failed: ${errorMessage}`],
             };
         }
     }
@@ -39407,7 +39407,9 @@ class FileMatcher {
                     const matchedPattern = this.matchesDecision(file, decision);
                     if (matchedPattern) {
                         matches.push({
-                            file, decision, matchedPattern,
+                            file,
+                            decision,
+                            matchedPattern,
                             matchDetails: {
                                 matched: true,
                                 matchedFiles: [file],
@@ -39478,7 +39480,7 @@ class FileMatcher {
             for (const decision of candidates) {
                 const matchedPattern = this.matchesDecision(normalizedFile, decision);
                 if (matchedPattern) {
-                    matches.push({ file: normalizedFile, decision, matchedPattern, });
+                    matches.push({ file: normalizedFile, decision, matchedPattern });
                 }
             }
         }
@@ -40088,7 +40090,7 @@ class RuleEvaluator {
                 };
             }
             if (!rule.content_rules || rule.content_rules.length === 0) {
-                this.logger.debug(`RuleEvaluator: File '${rule.pattern}' matched ${matchingFiles.length} files: ${matchingFiles.map(f => f.filename).join(', ')}`);
+                this.logger.debug(`RuleEvaluator: File '${rule.pattern}' matched ${matchingFiles.length} files: ${matchingFiles.map((f) => f.filename).join(', ')}`);
                 return {
                     matched: true,
                     matchedPatterns: [rule.pattern],
@@ -40259,7 +40261,9 @@ class RuleParser {
                 // to prevent them from being interpreted as relative filenames
                 const isWindowsSpecificAbsolute = path.win32.isAbsolute(relPath) && !path.posix.isAbsolute(relPath);
                 const isCrossPlatformAbsolute = process.platform !== 'win32' && isWindowsSpecificAbsolute;
-                if ((!resolvedPath.startsWith(normalizedWorkspace + path.sep) && resolvedPath !== normalizedWorkspace) || isCrossPlatformAbsolute) {
+                if ((!resolvedPath.startsWith(normalizedWorkspace + path.sep) &&
+                    resolvedPath !== normalizedWorkspace) ||
+                    isCrossPlatformAbsolute) {
                     return {
                         rules: null,
                         error: `Security Error: External rule file '${relPath}' resolves to a path outside the workspace. ` +

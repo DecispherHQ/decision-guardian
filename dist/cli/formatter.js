@@ -61,8 +61,8 @@ function formatSummary(stats) {
 }
 function groupBySeverity(matches) {
     return {
-        critical: matches.filter(m => m.decision.severity === 'critical'),
-        warning: matches.filter(m => m.decision.severity === 'warning'),
-        info: matches.filter(m => m.decision.severity === 'info'),
+        critical: matches.filter((m) => m.decision.severity === 'critical'),
+        warning: matches.filter((m) => m.decision.severity === 'warning'),
+        info: matches.filter((m) => m.decision.severity === 'info'),
     };
 }
