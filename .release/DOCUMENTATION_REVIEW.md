@@ -30,7 +30,7 @@
 - ✅ `docs/common/guide_indepth.md` - In-depth guide still accurate
 - ✅ `docs/common/guide_overview.md` - Overview still accurate
 - ✅ `LICENSE` - MIT license unchanged
-- ✅ `action.yml` - Action metadata accurate (includes telemetry_enabled input)
+- ✅ `action.yml` - Action metadata accurate
 
 ---
 

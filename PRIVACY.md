@@ -88,13 +88,13 @@ The anonymous telemetry data helps us:
 
 ## Opt-Out
 
-Telemetry is **opt-in by default** and can be controlled via environment variables:
+Telemetry is **enabled by default (opt-out)** and can be controlled via environment variables for both GitHub Actions and CLI:
 
 ### GitHub Action
 ```yaml
 - uses: DecispherHQ/decision-guardian@v1
-  with:
-    telemetry_enabled: false  # Disable telemetry
+  env:
+    DG_TELEMETRY: '0'  # Disable telemetry
 ```
 
 ### CLI

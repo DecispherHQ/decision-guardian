@@ -34,37 +34,34 @@ When enabled, we collect only:
 
 ## Telemetry Control
 
-### GitHub Action (Opt-Out, Default: Enabled)
+### Unified Environment Variable Control (Opt-Out, Default: Enabled)
 
-Telemetry is **enabled by default** for GitHub Actions. To disable:
+Telemetry is **enabled by default** for both GitHub Actions and CLI. To disable, use the `DG_TELEMETRY` environment variable:
 
+**GitHub Action:**
 ```yaml
 - uses: DecispherHQ/decision-guardian@v1
+  env:
+    DG_TELEMETRY: '0'  # Disable telemetry
   with:
     token: ${{ secrets.GITHUB_TOKEN }}
-    telemetry_enabled: false  # Disable telemetry
 ```
 
-### CLI (Opt-In, Default: Disabled)
-
-Telemetry is **disabled by default** for CLI. To enable:
-
+**CLI:**
 ```bash
-DG_TELEMETRY=1 decision-guardian check .decispher/decisions.md
-```
-
-To explicitly disable (though it's already disabled by default):
-
-```bash
+# Disable for a single run
 DG_TELEMETRY=0 decision-guardian check .decispher/decisions.md
+
+# Disable permanently
+export DG_TELEMETRY=0
 ```
 
 ### Custom Endpoint
 
-For self-hosted telemetry (CLI only):
+For self-hosted telemetry:
 
 ```bash
-DG_TELEMETRY=1 DG_TELEMETRY_URL=https://your-server.com/collect decision-guardian check ...
+DG_TELEMETRY_URL=https://your-server.com/collect decision-guardian check ...
 ```
 
 ## Architecture

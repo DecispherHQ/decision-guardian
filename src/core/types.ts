@@ -72,7 +72,6 @@ export interface ActionConfig {
     decisionFile: string; // Path to decisions.md
     failOnCritical: boolean; // Should critical violations fail the check?
     failOnError: boolean; // Should parse errors fail the check?
-    telemetryEnabled: boolean; // Should telemetry be sent? (GitHub Action only)
     token: string; // Auth token (GitHub token, GitLab token, etc.)
 }
 

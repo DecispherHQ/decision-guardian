@@ -213,7 +213,6 @@ const ConfigSchema = z.object({
     .refine((val) => !val.includes('..'), 'Path traversal not allowed'),
   failOnCritical: z.boolean(),
   failOnError: z.boolean(),
-  telemetryEnabled: z.boolean(),
   token: z.string().min(1, 'Token cannot be empty'),
 });
 
@@ -225,7 +224,6 @@ function loadConfig(): ActionConfig {
     decisionFile: logger.getInput('decision_file') || '.decispher/decisions.md',
     failOnCritical: logger.getBooleanInput('fail_on_critical'),
     failOnError: logger.getBooleanInput('fail_on_error'),
-    telemetryEnabled: logger.getBooleanInput('telemetry_enabled'),
     token: logger.getInput('token', true),
   };
 
@@ -257,7 +255,7 @@ function loadConfig(): ActionConfig {
 /**
  * Report metrics using the decoupled snapshot approach
  */
-function reportMetrics(config: ActionConfig): void {
+function reportMetrics(_config: ActionConfig): void {
   const snapshot = metrics.getSnapshot();
 
   logger.info('=== Performance Metrics ===');
@@ -271,10 +269,8 @@ function reportMetrics(config: ActionConfig): void {
 
   logger.setOutput('metrics', JSON.stringify(snapshot));
 
-  // Send telemetry only if enabled (GitHub Action control)
-  if (config.telemetryEnabled) {
-    sendTelemetry('action', snapshot, VERSION).catch(() => { });
-  }
+  // Send telemetry (controlled by DG_TELEMETRY env variable)
+  sendTelemetry('action', snapshot, VERSION).catch(() => { });
 }
 
 /**

@@ -232,8 +232,9 @@ npx decision-guardian check .decispher/decisions.md --staged --fail-on-critical
 | `decision_file` | `.decispher/decisions.md` | Path to file or directory |
 | `fail_on_critical` | `false` | Fail PR check on critical violations |
 | `fail_on_error` | `false` | Fail on parse errors |
-| `telemetry_enabled` | `true` | Send anonymous usage metrics ([Privacy Policy](PRIVACY.md)) |
 | `token` | `${{ github.token }}` | GitHub token (required) |
+
+> **Note**: Telemetry is controlled via the `DG_TELEMETRY` environment variable. Set `DG_TELEMETRY=0` to disable. See [Privacy Policy](PRIVACY.md) for details.
 
 ### Outputs
 
