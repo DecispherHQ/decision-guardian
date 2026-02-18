@@ -173,6 +173,16 @@ async function run() {
             logger.info('No decision matches found - PR is clear!');
             logger.setOutput('matches_found', '0');
             logger.setOutput('critical_count', '0');
+            if (provider.postAllClear) {
+                logger.startGroup('Updating status to All Clear...');
+                try {
+                    await provider.postAllClear();
+                }
+                catch (error) {
+                    logger.warning(`Failed to post all-clear status: ${error}`);
+                }
+                logger.endGroup();
+            }
         }
         const duration = Date.now() - startTime;
         (0, logger_1.logStructured)(logger, 'info', 'Decision Guardian completed successfully', {

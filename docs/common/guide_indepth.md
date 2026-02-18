@@ -121,7 +121,9 @@ Decision Guardian uses a smart hash-based system to manage PR comments:
 - ✅ Previously matched files no longer match
 - ✅ Different patterns match the same files
 - ✅ Decision severity/content changes
+- ✅ Updates to "All Clear" status when 0 matches found
 - ❌ No update if exact same matches (hash unchanged)
+- ❌ No update if "All Clear" status already shown
 
 **The hash is stored in the comment as**:
 ```html

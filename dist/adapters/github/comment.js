@@ -43,7 +43,8 @@ class CommentManager {
     octokit;
     logger;
     MARKER = '<!-- decision-guardian-v1 -->';
-    MAX_COMMENT_LENGTH = 60000;
+    ALL_CLEAR_HASH = 'all-clear';
+    MAX_COMMENT_LENGTH = 60000; // GitHub API limit is 65536
     constructor(token, logger) {
         this.octokit = github.getOctokit(token);
         this.logger = logger;
@@ -69,6 +70,9 @@ class CommentManager {
             }
         }
     }
+    /**
+     * Core logic for posting or updating comment
+     */
     async _postAlertAttempt(matches, prContext) {
         matches.sort((a, b) => {
             const idCompare = a.decision.id.localeCompare(b.decision.id);
@@ -159,6 +163,80 @@ class CommentManager {
             }
         }
     }
+    /**
+     * Update existing comment to "All Clear" status when no matches are found.
+     * Only updates if there was a previous Decision Guardian comment.
+     */
+    async postAllClear(prContext) {
+        let owner;
+        let repo;
+        let pull_number;
+        if (prContext) {
+            owner = prContext.owner;
+            repo = prContext.repo;
+            pull_number = prContext.number;
+        }
+        else {
+            const context = github.context;
+            if (!context.payload.pull_request) {
+                this.logger.warning('Not a pull request event, skipping all-clear comment');
+                return;
+            }
+            owner = context.repo.owner;
+            repo = context.repo.repo;
+            pull_number = context.payload.pull_request.number;
+        }
+        const existingComments = await this.findExistingComments(owner, repo, pull_number);
+        if (existingComments.length === 0) {
+            this.logger.info('No existing Decision Guardian comment found, skipping all-clear update');
+            return;
+        }
+        const targetComment = existingComments[0];
+        const oldHash = this.extractHash(targetComment.body);
+        if (oldHash === this.ALL_CLEAR_HASH) {
+            this.logger.info('Comment is already showing all-clear status, skipping update');
+            return;
+        }
+        if (existingComments.length > 1) {
+            this.logger.info(`Found ${existingComments.length} duplicate comments, cleaning up...`);
+            for (let i = 1; i < existingComments.length; i++) {
+                try {
+                    await this.octokit.rest.issues.deleteComment({
+                        owner,
+                        repo,
+                        comment_id: existingComments[i].id,
+                    });
+                }
+                catch (error) {
+                    this.logger.warning(`Failed to delete duplicate comment ${existingComments[i].id}: ${error}`);
+                }
+            }
+        }
+        const allClearBody = this.buildAllClearComment();
+        try {
+            await this.octokit.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: targetComment.id,
+                body: allClearBody,
+            });
+            this.logger.info('Updated comment to all-clear status');
+            return;
+        }
+        catch (error) {
+            const errWithStatus = error;
+            if (errWithStatus.status === 404) {
+                this.logger.warning(`Comment ${targetComment.id} was deleted, skipping all-clear update`);
+                return;
+            }
+            const message = error instanceof Error ? error.message : String(error);
+            this.logger.error(`Failed to update comment to all-clear status: ${message}`);
+            throw error;
+        }
+    }
+    /**
+     * Find all existing Decision Guardian comments
+     */
     async findExistingComments(owner, repo, issue_number) {
         try {
             const found = [];
@@ -187,6 +265,9 @@ class CommentManager {
             return [];
         }
     }
+    /**
+     * Generate content hash based on decision IDs, files, and matched patterns
+     */
     hashContent(matches) {
         const key = matches
             .map((m) => `${m.decision.id}:${m.file}:${m.matchDetails?.matchedPatterns?.join(',') || ''}`)
@@ -194,10 +275,17 @@ class CommentManager {
             .join('|');
         return crypto.createHash('sha256').update(key, 'utf8').digest('hex').substring(0, 16);
     }
+    /**
+     * Extract hash from existing comment
+     */
     extractHash(commentBody) {
-        const match = commentBody.match(/<!-- hash:([a-f0-9-]+) -->/);
+        // Match both hex hashes (16 chars) and special hashes like 'all-clear'
+        const match = commentBody.match(/<!-- hash:([a-z0-9-]+) -->/);
         return match ? match[1] : null;
     }
+    /**
+     * Format matches into markdown comment
+     */
     formatComment(matches, hash) {
         const fullComment = this.buildFullComment(matches, hash);
         if (fullComment.length > this.MAX_COMMENT_LENGTH) {
@@ -206,6 +294,9 @@ class CommentManager {
         }
         return fullComment;
     }
+    /**
+     * Build the full comment without truncation
+     */
     buildFullComment(matches, hash) {
         const grouped = this.groupBySeverity(matches);
         const uniqueFiles = new Set(matches.map((m) => m.file)).size;
@@ -237,6 +328,23 @@ class CommentManager {
         comment += `Update decisions in your \`.decispher/\` folder if needed.*\n`;
         return comment;
     }
+    /**
+     * Build the "All Clear" comment when no decision rules are triggered
+     */
+    buildAllClearComment() {
+        let comment = `${this.MARKER}\n`;
+        comment += `<!-- hash:${this.ALL_CLEAR_HASH} -->\n\n`;
+        comment += `## ✅ Decision Guardian - All Clear\n\n`;
+        comment += `This PR no longer modifies any files protected by architectural decisions.\n\n`;
+        comment += `> **Great job!** All previously flagged decision contexts have been resolved.\n\n`;
+        comment += `---\n`;
+        comment += `*🤖 Generated by [Decision Guardian](https://github.com/DecispherHQ/decision-guardian). `;
+        comment += `Update decisions in your \`.decispher/\` folder if needed.*\n`;
+        return comment;
+    }
+    /**
+     * Build truncated comment when full comment exceeds GitHub's limit
+     */
     buildTruncatedComment(matches, hash) {
         const detailLimits = [20, 10, 5, 2, 0];
         const fileLimitsPerDecision = [10, 5, 3, 1];
@@ -255,6 +363,9 @@ class CommentManager {
         this.logger.warning(`Comment still too long (${ultraCompact.length} chars), applying hard truncation`);
         return this.hardTruncate(ultraCompact);
     }
+    /**
+     * Build truncated comment with specific limits for detailed matches and files per decision
+     */
     buildTruncatedCommentWithLimits(matches, hash, maxDetailedMatches, maxFilesPerDecision) {
         const grouped = this.groupBySeverity(matches);
         const uniqueFiles = new Set(matches.map((m) => m.file)).size;
@@ -309,6 +420,9 @@ class CommentManager {
         comment += `Showing ${detailedCount} of ${matches.length} matches.*\n`;
         return comment;
     }
+    /**
+     * Build ultra-compact comment showing only counts (last resort before hard truncation)
+     */
     buildUltraCompactComment(matches, hash) {
         const grouped = this.groupBySeverity(matches);
         const byDecision = new Map();
@@ -351,6 +465,9 @@ class CommentManager {
         comment += `Details truncated.*\n`;
         return comment;
     }
+    /**
+     * Hard truncate comment as final safety measure
+     */
     hardTruncate(comment) {
         const truncationNotice = `\n\n---\n*⚠️ Comment truncated due to GitHub's 65536 character limit.*\n`;
         const maxLength = this.MAX_COMMENT_LENGTH - truncationNotice.length;
@@ -360,6 +477,15 @@ class CommentManager {
         }
         return comment.substring(0, breakPoint) + truncationNotice;
     }
+    /**
+     * Build a compact summary section for matches that couldn't be shown in detail
+     */
+    buildSummarySectionForRemaining(matches) {
+        return this.buildSummarySectionForRemainingWithLimit(matches, 10);
+    }
+    /**
+     * Build a compact summary section with configurable file limit per decision
+     */
     buildSummarySectionForRemainingWithLimit(matches, maxFilesPerDecision) {
         const byDecision = new Map();
         for (const match of matches) {
@@ -384,6 +510,9 @@ class CommentManager {
         section += `</details>\n\n`;
         return section;
     }
+    /**
+     * Format a single match with link to source, blockquote context, and collapsible for long content
+     */
     formatMatch(match) {
         const escapeMarkdown = (str) => {
             return str
@@ -400,6 +529,7 @@ class CommentManager {
             }
         }
         const matchType = matchDetails ? 'Rule-based' : 'File pattern';
+        // Build source file link (full GitHub blob URL)
         const workspaceRoot = process.env.GITHUB_WORKSPACE || process.cwd();
         let relativeSourceFile = decision.sourceFile;
         const normalizedSource = decision.sourceFile.replace(/\\/g, '/');
@@ -409,6 +539,7 @@ class CommentManager {
                 .substring(normalizedWorkspace.length)
                 .replace(/^\//, '');
         }
+        // Construct full GitHub blob URL for the source file (if context available)
         let sourceLink;
         const context = github.context;
         if (context?.repo?.owner && context?.repo?.repo) {
@@ -421,12 +552,15 @@ class CommentManager {
                     : `[${relativeSourceFile}](${blobUrl})`;
         }
         else {
+            // Fallback when context is not available
             sourceLink = `\`${relativeSourceFile}\``;
         }
+        // Format context with blockquote, collapsible if long (>300 chars)
         const contextText = decision.context.trim();
         const CONTEXT_THRESHOLD = 300;
         let contextSection;
         if (contextText.length > CONTEXT_THRESHOLD) {
+            // Long context: use collapsible
             const preview = contextText.substring(0, 150).trim() + '...';
             contextSection = `> ${escapeMarkdown(preview)}\n\n`;
             contextSection += `<details>\n<summary>📖 Read full context</summary>\n\n`;
@@ -434,6 +568,7 @@ class CommentManager {
             contextSection += `</details>\n`;
         }
         else {
+            // Short context: use simple blockquote
             contextSection = `> ${escapeMarkdown(contextText).split('\n').join('\n> ')}\n`;
         }
         return `
@@ -452,6 +587,9 @@ ${contextSection}
 
 `;
     }
+    /**
+     * Group matches by severity
+     */
     groupBySeverity(matches) {
         return {
             critical: matches.filter((m) => m.decision.severity === 'critical'),

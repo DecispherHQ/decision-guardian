@@ -206,6 +206,7 @@ npx decision-guardian checkall --fail-on-critical
 - Updates existing comments instead of creating duplicates
 - Only active decisions trigger alerts
 - Self-healing duplicate cleanup
+- Auto-resolves to 'All Clear' when issues are fixed
 - Progressive truncation for large PRs
 
 ✅ **Local CLI** ([docs](docs/cli/CLI.md))
