@@ -6,14 +6,22 @@
 2. [What is Decision Guardian?](#what-is-decision-guardian)
 3. [Quick Start](#quick-start)
 4. [Installation & Integration](#installation--integration)
-5. [The Decisions File](#the-decisions-file)
-6. [Decision Format Reference](#decision-format-reference)
-7. [Advanced Rules System](#advanced-rules-system)
-8. [Configuration Options](#configuration-options)
-9. [Use Cases & Examples](#use-cases--examples)
-10. [Troubleshooting](#troubleshooting)
-11. [Performance & Optimization](#performance--optimization)
-12. [Best Practices](#best-practices)
+5. [CLI Mode Deep Dive](#cli-mode-deep-dive)
+6. [The Decisions File](#the-decisions-file)
+7. [Decision Format Reference](#decision-format-reference)
+8. [Advanced Rules System](#advanced-rules-system)
+9. [Configuration Options](#configuration-options)
+10. [Telemetry & Data Privacy](#telemetry--data-privacy)
+11. [Use Cases & Examples](#use-cases--examples)
+12. [Troubleshooting](#troubleshooting)
+13. [Performance & Optimization](#performance--optimization)
+14. [Best Practices](#best-practices)
+15. [Decision Lifecycle Management](#decision-lifecycle-management)
+16. [Advanced Patterns](#advanced-patterns)
+17. [Testing Your Decisions](#testing-your-decisions)
+18. [Migration Guide](#migration-guide)
+19. [FAQ](#faq)
+20. [Additional Resources](#additional-resources)
 
 ---
 
@@ -23,7 +31,7 @@ Decision Guardian is a tool that automatically surfaces architectural decisions 
 
 ### Key Features
 
-- **Automatic Context Surfacing**: Alerts appear as PR comments when protected files are modified
+- **Automatic Context Surfacing**: Alerts appear as PR comments (GitHub Action) or terminal output (CLI) when protected files are modified
 - **Severity Levels**: Categorize decisions as Critical, Warning, or Info
 - **Advanced Pattern Matching**: Support for glob patterns, regex, content-based rules, and nested logic
 - **Performance Optimized**: Handles PRs with thousands of files efficiently
@@ -38,7 +46,7 @@ Decision Guardian helps engineering teams by:
 1. **Preserving Context**: Documents "why" certain files or patterns require careful review
 2. **Onboarding New Developers**: Automatically educates team members about architectural decisions
 3. **Preventing Technical Debt**: Surfaces warnings before problematic changes are merged
-4. **Enforcing Standards**: Can fail PR checks for critical violations
+4. **Enforcing Standards**: Can fail PR checks (GitHub Action) or exit with code 1 (CLI) for critical violations
 
 ### How It Works
 
@@ -169,6 +177,9 @@ on:
 jobs:
   check-decisions:
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write  # Required to post PR comments
+      contents: read
     steps:
       - uses: actions/checkout@v4
       
@@ -178,6 +189,8 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           fail_on_critical: true
 ```
+
+> **⚠️ Important**: The `permissions` block is required. On repositories where the default token has restricted permissions (common in organizations), omitting it will cause the action to silently fail to post comments.
 
 ### 3. Test It
 
@@ -189,9 +202,13 @@ Create a PR that modifies `src/config/database.ts`. Decision Guardian will autom
 
 ### Prerequisites
 
-- GitHub repository
-- GitHub Actions enabled
-- Node.js 20+ (handled automatically by the action)
+**GitHub Action** (automated PR checks):
+- GitHub repository with Actions enabled
+- Node.js 20+ (handled automatically by the runner)
+
+**CLI** (local development or any CI system):
+- Node.js 20+
+- Git repository
 
 ### Step-by-Step Integration
 
@@ -345,7 +362,7 @@ decision-guardian check .decispher/decisions.md --fail-on-critical
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--staged` | boolean | `true` | Compare staged changes (git diff --cached) |
-| `--branch <name>` | string | - | Compare against specified branch |
+| `--branch <branch-name>` | string | - | Compare against specified branch (e.g. `main`, `origin/main`) |
 | `--all` | boolean | `false` | Compare all uncommitted changes (staged + unstaged) |
 | `--fail-on-critical` | boolean | `false` | Exit with code 1 if critical decisions triggered |
 
@@ -484,6 +501,12 @@ git add src/config/database.ts
 decision-guardian check .decispher/decisions.md  # Uses --staged by default
 git commit -m "Update database config"
 ```
+
+> **⚠️ Common Pitfall — No Staged Files**: `--staged` is the default mode. If you run `decision-guardian check` without staging any files first, you will see:
+> ```
+> No changes detected
+> ```
+> This is **not a bug** — it means there is nothing in the staging area (`git diff --cached` returned empty). To check unstaged changes, use `--all`. To check against a branch, use `--branch main`.
 
 #### Branch Mode (`--branch <name>`)
 
@@ -1055,6 +1078,7 @@ Directory structure example:
 - Use trailing slash to clearly indicate a directory: `.decispher/` vs `.decispher/decisions.md`
 - If a directory contains no `.md` files, you'll get an error about missing decisions
 - Parse errors in any file are collected and reported together
+- **Non-decision Markdown files** (e.g. a `README.md` inside `.decispher/` that explains your decision structure) will be parsed but will not match any `<!-- DECISION-* -->` markers. They are silently ignored — no parse errors will be produced for files that simply contain no decision blocks. You do **not** need to exclude them.
 
 
 ---
@@ -1152,14 +1176,6 @@ This tracks when the decision was made. Decision Guardian will warn if:
 
 ```markdown
 **Severity**: Critical
-
-#### Schema Version (Internal)
-
-Decision Guardian internally tracks a schema version for every decision.
-
-- **Field**: `schemaVersion`
-- **Current Value**: `1` (Always)
-- **Purpose**: Future-proofing for potential schema changes. You generally don't need to specify this manually in Markdown; the parser assigns version 1 automatically.
 ```
 
 **Valid Values**:
@@ -1169,6 +1185,14 @@ Decision Guardian internally tracks a schema version for every decision.
 | `Info` | `Informational`, `Low` | FYI notices, documentation | No |
 | `Warning` | `Warn`, `Medium` | Important but not blocking | No |
 | `Critical` | `Error`, `High`, `Blocker` | Must be reviewed carefully | Yes (if `fail_on_critical: true`) |
+
+#### Schema Version (Internal)
+
+Decision Guardian internally tracks a schema version for every decision.
+
+- **Field**: `schemaVersion`
+- **Current Value**: `1` (Always)
+- **Purpose**: Future-proofing for potential schema changes. You generally don't need to specify this manually in Markdown; the parser assigns version 1 automatically.
 
 #### Files
 
@@ -1899,6 +1923,7 @@ Total number of decision matches found.
 **Type**: Number
 
 Number of Critical severity matches.
+
 #### `metrics`
 
 **Type**: JSON String
@@ -1956,6 +1981,130 @@ Duration: 4521ms
     echo "Files: $(echo $METRICS | jq -r '.files_processed')"
 ```
 
+
+---
+
+## Sample PR Comment
+
+When Decision Guardian finds matches, it posts a structured comment on the Pull Request. Here is what a typical comment looks like:
+
+---
+
+<!-- decision-guardian-v1 -->
+<!-- hash:a1b2c3d4e5f6 -->
+
+## ⚠️ Decision Context Alert
+
+This PR modifies **3 file(s)** protected by architectural decisions. Please review the context below before merging.
+
+---
+
+### 🔴 Critical Decisions (1)
+
+#### DECISION-DB-001: Database Connection Pool Configuration
+
+**File**: `src/config/database.ts`  
+**Matched**: `src/config/*.ts`  
+**Match Type**: File pattern  
+**Date**: 2025-01-15
+
+These files control database connection pooling. Changes here can cause:
+- Connection exhaustion under load
+- Memory leaks
+- Performance degradation
+
+Always load-test changes with production-like traffic patterns.
+
+---
+
+### 🟡 Important Decisions (1)
+
+#### DECISION-API-001: Public API Contract Protection
+
+**File**: `src/api/v1/users.ts`  
+**Matched**: `src/api/v1/**/*.ts`  
+**Match Type**: Rule-based  
+**Date**: 2025-01-12
+
+Changes to v1 API routes affect external clients. Before merging:
+- Update API documentation
+- Notify integration partners
+- Consider deprecation path
+
+---
+
+### ℹ️ Informational (1)
+
+#### DECISION-PERF-001: Performance-Critical Path
+
+**File**: `src/services/search.ts`  
+**Matched**: `src/services/search.ts`  
+**Match Type**: File pattern  
+**Date**: 2025-01-05
+
+This file handles 10K+ req/s. Run benchmarks before merging.
+
+---
+*🤖 Generated by [Decision Guardian](https://github.com/DecispherHQ/decision-guardian)*
+
+---
+
+**Key elements of the comment:**
+- **Header** — identifies the comment for idempotent updates (the `<!-- hash:... -->` tag prevents duplicate edits)
+- **Severity groupings** — 🔴 Critical, 🟡 Important (Warning), ℹ️ Informational
+- **Per-match details** — which file triggered it, which pattern matched, and the full decision context
+- **Footer** — attribution link
+
+When no violations are found on a subsequent commit (after a previous violation), the comment updates to show an **All Clear ✅** status instead of being deleted.
+
+---
+
+## Error Message Reference
+
+A consolidated reference of all error and warning messages you may encounter, their causes, and how to fix them.
+
+### Parse-Time Errors & Warnings
+
+| Message | Cause | Fix |
+|---------|-------|-----|
+| `Warning: Line N: Decision missing required fields (id or title)` | A decision block is missing the `<!-- DECISION-ID -->` marker or `## Decision:` title | Add the missing marker/title |
+| `Warning: DECISION-XXX: Failed to parse JSON rules: Unexpected token` | Malformed JSON in a `**Rules**:` block | Validate JSON with [jsonlint.com](https://jsonlint.com) |
+| `Warning: DECISION-XXX: Invalid date format` | Date is not in `YYYY-MM-DD` format | Use ISO 8601 format: `2025-01-15` |
+| `Warning: DECISION-XXX: Date is in the future` | Decision date is set to a future date | Correct the date |
+| `Warning: DECISION-XXX: Date is more than 10 years old` | Decision may be stale | Review and update or archive the decision |
+| `Warning: DECISION-XXX: Unknown status value` | Status is not one of the valid values | Use `Active`, `Deprecated`, `Superseded`, or `Archived` |
+
+### Security Errors
+
+| Message | Cause | Fix |
+|---------|-------|-----|
+| `Security: Path traversal detected` | `decision_file` input contains `..` or is an absolute path | Use a relative path without `..` (e.g. `.decispher/decisions.md`) |
+| `[Security] Unsafe regex pattern rejected` | A regex in a `Rules` block could cause catastrophic backtracking (ReDoS) | Simplify the regex; avoid patterns like `(a+)+` or `(.*)*` |
+| `[Security] Regex pattern too complex` | Regex pattern exceeds 1000 characters | Shorten the pattern |
+| `[Security] Content exceeds size limit` | The diff content being matched exceeds 1 MB | Use file-level patterns instead of content rules for very large files |
+
+### Runtime Errors
+
+| Message | Cause | Fix |
+|---------|-------|-----|
+| `Failed to read file: ENOENT` | Decision file not found at the specified path | Verify the file exists and is committed; check `decision_file` path |
+| `Not a pull request event, skipping comment` | Workflow triggered on `push` or other non-PR event | Ensure workflow trigger is `on: pull_request` |
+| `No changes detected` | No files in the comparison scope (e.g. nothing staged in `--staged` mode) | Stage files first (`git add`) or use `--all` / `--branch` mode |
+| `No git repository found` | CLI run outside a git repository | Run from within a git repository root |
+| `Rule evaluation failed for pattern "...": ...` | A rule threw an unexpected error during evaluation | Check rule JSON syntax and regex validity; enable debug mode for details |
+| `Warning: Comment would exceed 60000 chars, truncating...` | PR has too many matches to fit in one GitHub comment | Use more specific patterns to reduce match count |
+| `Found N duplicate comments, cleaning up...` | Race condition created multiple Decision Guardian comments | Informational — auto-cleaned. Add `concurrency:` to workflow to prevent |
+| `Conflict detected when posting comment, retrying... (N/3)` | Concurrent workflow runs hit a 409 conflict | Informational — auto-retried. Add `concurrency:` to workflow |
+| `Rate limit hit for fetch files page N. Waiting Xs before retry N/3` | GitHub API rate limit exceeded | Wait for reset, re-run workflow, or split large PRs |
+| `Error reading external rule file: ...` | External JSON rule file not found at the resolved path | Verify the path is relative to the decision file's location |
+
+### CLI-Specific Errors
+
+| Message | Cause | Fix |
+|---------|-------|-----|
+| `Error: No .decispher/ directory found` | `checkall` run in a directory with no `.decispher/` folder | Run from repo root or create `.decispher/` with `decision-guardian init` |
+| `Error reading decision file: ...` | File path argument to `check` is wrong | Verify the path; use `decision-guardian checkall` to auto-discover |
+| `Exit code 1 (no violations shown)` | Parse error in decision file with `--fail-on-critical` | Check decision file syntax; look for malformed IDs or JSON |
 
 ---
 
@@ -3681,30 +3830,8 @@ Decision Guardian is MIT licensed. Free for commercial and personal use.
 
 ---
 
-## Changelog
-
-### v1.1.0 (2025-02-17)
-
-**Enhancements & Fixes**
-
-- Improved JSON path matching heuristic
-- Added `--list` and `--output` flags to `template` command
-- Security: Recursive file limit, regex validation, and rate limiting
-- Telemetry: Now enabled by default (opt-out with `DG_TELEMETRY=0`)
-
-### v1.0.0 (2025-01-15)
-
-**Initial Release**
-
-- File pattern matching with glob support
-- Advanced rules system (AND/OR logic, content matching)
-- Severity levels (Critical, Warning, Info)
-- Automatic comment posting and updates
-- Performance optimization for large PRs
-- Comprehensive documentation
-
----
-
 **Decision Guardian** - Surface architectural context automatically.
 
 Built with ❤️ by the Decispher Team
+
+> **📋 Changelog**: For the full version history, see [CHANGELOG.md](https://github.com/DecispherHQ/decision-guardian/blob/main/CHANGELOG.md).

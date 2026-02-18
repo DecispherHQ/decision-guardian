@@ -1,6 +1,6 @@
 # Decision Guardian
 
-> **Prevent institutional amnesia by surfacing past architectural decisions directly on Pull Requests.**
+> **Prevent institutional amnesia by surfacing past architectural decisions directly on Pull Requests (or CLI checks).**
 
 [![GitHub Action](https://img.shields.io/badge/GitHub-Action-blue?logo=github-actions)](https://github.com/marketplace/actions/decision-guardian)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -43,9 +43,11 @@ Result: Team wastes 3 months re-evaluating the same decision
 
 We explicitly guarantee:
 
-- ❌ **No external network calls**: The action runs entirely within your GitHub Actions runner.
-- ❌ **No data leaves GitHub**: Your code, decisions, and logic never leave your repository.
+- ✅ **No source code leaves your repo**: Only anonymous aggregate counts (file count, match count, duration) are collected — never file contents, paths, or identifiers.
+- ✅ **Opt-out telemetry**: Anonymous usage metrics are sent to Cloudflare to help improve the tool. Disable with `DG_TELEMETRY=0`. See [PRIVACY.md](PRIVACY.md).
 - ✅ **Read-only access**: We only require write permissions to post comments on Pull Requests.
+
+> **Note**: v1.1 introduces opt-out telemetry. If your organization requires zero external network calls, set `DG_TELEMETRY=0` in your workflow `env`.
 
 See [SECURITY.md](SECURITY.md) for our full security policy.
 
@@ -114,6 +116,8 @@ jobs:
           fail_on_critical: true
 ```
 
+> **Production tip**: Add a `concurrency` block to prevent duplicate comments from parallel runs. See the [full workflow example](docs/github/APP_WORKING.md) for a production-ready configuration.
+
 ### 3. See It Work
 
 When someone opens a PR modifying `src/db/pool.ts`, Decision Guardian automatically comments with the context from `DECISION-DB-001`.
@@ -169,7 +173,11 @@ stage('Check Decisions') {
 **Pre-commit Hook:**
 ```bash
 #!/bin/sh
+# Single file check
 npx decision-guardian check .decispher/decisions.md --staged --fail-on-critical
+
+# Or use checkall to auto-discover all decision files (recommended for multi-file setups)
+npx decision-guardian checkall --fail-on-critical
 ```
 
 ---
@@ -486,7 +494,7 @@ v1 API changes affect external clients.
 │  │      COMMENT MANAGER (Idempotent)            │  │
 │  │  - Hash-based update detection               │  │
 │  │  - Self-healing duplicate cleanup            │  │
-│  │  - Progressive truncation (5 layers)         │  │
+│  │  - Progressive truncation (6 layers)         │  │
 │  │  - Retry with exponential backoff            │  │
 │  └──────────────────────────────────────────────┘  │
 │                                                    │
@@ -513,7 +521,7 @@ PR Created → Parse Decisions → Match Files → Post Comment → Check Status
 - **Streaming Mode**: Processes PRs with 3000+ files without OOM
 - **Smart Caching**: Regex results cached to prevent ReDoS
 - **Batch Processing**: Parallel evaluation with concurrency limits
-- **Progressive Truncation**: 5-layer fallback ensures comments always fit
+- **Progressive Truncation**: 6-layer fallback ensures comments always fit
 
 ### Security
 

@@ -106,7 +106,7 @@ npm run build
 
 ### Contribution Scope
 
-Decision Guardian is the **open-source GitHub Action** component of the Decispher ecosystem. Contributions should focus on:
+Decision Guardian is the **open-source** component of the Decispher ecosystem. Contributions should focus on:
 
 **In Scope:**
 - ✅ Bug fixes for the GitHub Action and CLI
@@ -205,18 +205,15 @@ decision-guardian/
 │   │   └── privacy.ts                # Blocklist validation
 │   │
 │   ├── main.ts                       # GitHub Action entry point
-│   └── logger.ts                     # logStructured() helper
+│   └── version.ts                    # Version
 │
 ├── templates/                        # Decision file templates
 ├── workers/telemetry/                # Cloudflare Worker backend
-├── docs/                             # CLI, Architecture, Telemetry docs
-├── docs/                             # Existing guides and roadmap
-├── tests/                            # Organized by module
-│   ├── core/
+├── docs/                             # CLI, Architecture, Telemetry
+│   ├── common/
 │   ├── cli/
-│   ├── adapters/
-│   ├── telemetry/
-│   └── fixtures/
+│   └── github/
+│
 ├── action.yml                        # GitHub Action metadata
 ├── package.json
 └── tsconfig.json
@@ -552,16 +549,13 @@ counter++;
 Tests use **Jest** and mirror the source structure:
 
 ```
-__tests__/
-├── parser.test.ts
-├── matcher.test.ts
-├── rule-evaluator.test.ts
-├── content-matchers.test.ts
-├── trie.test.ts
-└── fixtures/
-    ├── valid-decisions.md
-    ├── invalid-decisions.md
-    └── test-rules.json
+├── tests/                         # REORGANIZED and EXPANDED
+│   ├── core/                      # Tests for src/core/ modules
+│   ├── cli/                       # NEW: CLI command tests
+│   ├── adapters/                  # NEW: Adapter tests
+│   ├── telemetry/                 # NEW: Telemetry tests
+│   └── fixtures/                  # Test fixtures
+
 ```
 
 ### Writing Tests

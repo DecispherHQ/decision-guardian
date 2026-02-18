@@ -124,6 +124,8 @@ export DG_TELEMETRY=0
 - **URL**: `https://decision-guardian-telemetry.iamalizaidi110.workers.dev/collect`
 - **Stats**: `https://decision-guardian-telemetry.iamalizaidi110.workers.dev/stats` (public, aggregated data)
 
+> **Note**: The `iamalizaidi110.workers.dev` subdomain is the official production endpoint for Decision Guardian telemetry, deployed on Cloudflare Workers. The worker source code is open source and available in [`workers/telemetry/`](./workers/telemetry/).
+
 ## Questions or Concerns?
 
 If you have any questions or concerns about our telemetry practices:

@@ -37,7 +37,16 @@ Auto-discover and check all `.decispher/` files in the current directory.
 ```bash
 decision-guardian checkall
 decision-guardian checkall --fail-on-critical
+decision-guardian checkall --branch main
+decision-guardian checkall --all
 ```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--staged` | ✅ | Compare staged changes |
+| `--branch <base>` | | Compare against a branch |
+| `--all` | | Compare all uncommitted changes |
+| `--fail-on-critical` | | Exit code 1 if critical decisions triggered |
 
 ### `init`
 
@@ -89,6 +98,13 @@ check-decisions:
   image: node:20
   script:
     - npx decision-guardian check .decispher/decisions.md --branch $CI_MERGE_REQUEST_TARGET_BRANCH_NAME --fail-on-critical
+```
+
+## Global Flags
+
+```bash
+decision-guardian --help     # Show usage and available commands
+decision-guardian --version  # Show installed version
 ```
 
 ## Bundle Size

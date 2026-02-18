@@ -1,6 +1,6 @@
 # Decision Guardian
 
-**Prevent institutional amnesia by surfacing architectural decisions on Pull Requests**
+**Prevent institutional amnesia by surfacing architectural decisions on Pull Requests and local CLI checks**
 
 ---
 
@@ -31,6 +31,8 @@
 ---
 
 ## Quick Start
+
+> **GitHub Action path** (automated PR checks). For local development or non-GitHub CI, skip to [CLI Tool Installation](#cli-tool-installation).
 
 ### 1. Create Decision File
 
@@ -89,7 +91,12 @@ jobs:
 
 ### 3. Test
 
-Open a PR modifying `src/config/database.ts` → Decision Guardian posts a comment with context.
+**GitHub Action**: Open a PR modifying `src/config/database.ts` → Decision Guardian posts a comment with context.
+
+**CLI**: Run locally against staged changes:
+```bash
+decision-guardian check .decispher/decisions.md --staged
+```
 
 ---
 
@@ -97,8 +104,13 @@ Open a PR modifying `src/config/database.ts` → Decision Guardian posts a comme
 
 ### Prerequisites
 
+**GitHub Action** (automated PR checks):
 - GitHub repository with Actions enabled
-- Node.js 20+ (handled automatically)
+- Node.js 20+ (handled automatically by the runner)
+
+**CLI** (local development or any CI system):
+- Node.js 20+
+- Git repository
 
 ### Basic Setup
 
@@ -193,7 +205,7 @@ decision-guardian init --template security
 | Flag | Description |
 |------|-------------|
 | `--staged` | Compare staged changes (default for `check`) |
-| `--branch <base>` | Compare against a specific branch |
+| `--branch <branch-name>` | Compare against a specific branch (e.g. `main`, `origin/main`) |
 | `--all` | Compare all uncommitted changes |
 | `--fail-on-critical` | Exit with code 1 if critical decisions are triggered |
 
@@ -293,7 +305,7 @@ Format: `DECISION-[CATEGORY-]NUMBER`
 | `Superseded` | `Replaced` | Triggers alerts, references new decision |
 | `Archived` | `Inactive` | No alerts |
 
-**Only `Active` decisions trigger PR comments.**
+**Only `Active` decisions trigger alerts** (PR comments for GitHub Action, terminal output for CLI).
 
 ### Date Field
 
@@ -305,9 +317,9 @@ Format: `YYYY-MM-DD` (ISO 8601)
 
 ### Severity Levels
 
-| Severity | Synonyms | Behavior | Fails PR? |
+| Severity | Synonyms | Behavior | Fails check? |
 |----------|----------|----------|-----------|
-| `Critical` | `Error`, `High`, `Blocker` | Red flag, requires review | Yes (if `fail_on_critical: true`) |
+| `Critical` | `Error`, `High`, `Blocker` | Red flag, requires review | Yes (if `fail_on_critical: true` / `--fail-on-critical`) |
 | `Warning` | `Warn`, `Medium` | Yellow flag | No |
 | `Info` | `Informational`, `Low` | FYI only | No |
 
@@ -769,7 +781,7 @@ Number of Critical severity matches.
 
 **Type**: `JSON string`
 
-Performance metrics:
+Performance metrics (declared in `action.yml` and set as a step output):
 
 ```json
 {
@@ -1069,7 +1081,7 @@ Decision Guardian is optimized for scale:
 
 ### Common Issues
 
-#### "Not a pull request event"
+#### *(GitHub Action)* "Not a pull request event"
 
 **Cause**: Workflow triggered on push, not PR.
 
@@ -1114,7 +1126,7 @@ Warning: DECISION-001: Failed to parse JSON rules
 - Check all required fields present
 - Case-sensitive field names
 
-#### No comment posted
+#### *(GitHub Action)* No comment posted
 
 **Causes**:
 
@@ -1128,7 +1140,15 @@ env:
   ACTIONS_STEP_DEBUG: true
 ```
 
-#### Rate limit hit
+#### *(CLI)* No output shown
+
+**Causes**:
+
+1. **No matches**: Changed files don't match any decision patterns
+2. **Wrong diff mode**: Try `--staged`, `--all`, or `--branch <base>` to select the right set of changes
+3. **Status not Active**: Decision must have `Status: Active`
+
+#### *(GitHub Action)* Rate limit hit
 
 **Rare** (only 3000+ file PRs).
 
@@ -1141,6 +1161,7 @@ If fails:
 
 ### Debug Mode
 
+**GitHub Action:**
 ```yaml
 - uses: DecispherHQ/decision-guardian@v1
   with:
@@ -1149,10 +1170,18 @@ If fails:
     ACTIONS_STEP_DEBUG: true
 ```
 
+**CLI:**
+```bash
+# The CLI prints match results and exit codes to stdout/stderr by default.
+# Use shell-level verbosity to inspect:
+decision-guardian check .decispher/decisions.md --branch main
+echo "Exit code: $?"
+```
+
 Outputs:
 - File matching logic
 - Rule evaluation steps
-- API calls/responses
+- API calls/responses (GitHub Action only)
 - Performance metrics
 
 ---
@@ -1375,9 +1404,11 @@ Changes affect PR protection.
 
 ## API Reference
 
+> **Note**: The Comment Format and Comment Behavior below apply to the **GitHub Action** only. The **CLI** outputs results directly to the terminal (stdout/stderr).
+
 ### Comment Format
 
-Decision Guardian posts structured comments:
+Decision Guardian posts structured PR comments:
 
 **Header**:
 ```markdown
@@ -1495,28 +1526,9 @@ Decispher is building tools to help engineering teams preserve and leverage inst
 
 ## Changelog
 
-### v1.0.0 (2025-02-03)
+For the full version history, see [CHANGELOG.md](../../CHANGELOG.md).
 
-**Initial Release**
-
-✅ **Core Features**:
-- File pattern matching (glob support)
-- Advanced rules system (AND/OR, content matching)
-- Severity levels (Critical/Warning/Info)
-- Idempotent PR comments
-- Directory scanning
-
-✅ **Performance**:
-- Trie-based pattern matching
-- Streaming for large PRs (3K+ files)
-- Regex caching
-- Parallel processing
-
-✅ **Security**:
-- Path traversal protection
-- ReDoS prevention (regex timeout + validation)
-- VM sandbox for regex
-- Input validation (zod)
+**Latest: v1.1.0** — CLI tool, decision templates, opt-in telemetry, SOLID architecture refactor. See CHANGELOG.md for complete details.
 
 ---
 
