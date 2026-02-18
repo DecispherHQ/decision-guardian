@@ -46,7 +46,7 @@ describe('sendTelemetry', () => {
         await sendTelemetry('cli', snapshot, '1.0.0');
         expect(mockFetch).toHaveBeenCalledTimes(1);
         expect(mockFetch).toHaveBeenCalledWith(
-            expect.stringContaining('decision-guardian-telemetry.iamalizaidi110.workers.dev'),
+            expect.stringContaining('decision-guardian-telemetry.decision-guardian-telemetry.workers.dev'),
             expect.objectContaining({ method: 'POST' })
         );
     });

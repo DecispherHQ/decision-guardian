@@ -7,5 +7,5 @@ ENVIRONMENT = "production"
 
 [[kv_namespaces]]
 binding = "TELEMETRY_KV"
-id = "1e21ce15f93247f5aa39d414de791c9c"
-preview_id = "1e21ce15f93247f5aa39d414de791c9c"
+id = "6d5d5f96934d4d5097c0526d6662d366"
+preview_id = "6d5d5f96934d4d5097c0526d6662d366"

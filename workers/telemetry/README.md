@@ -22,7 +22,7 @@ Collects telemetry events from Decision Guardian runs.
 
 **Request:**
 ```bash
-curl -X POST https://decision-guardian-telemetry.iamalizaidi110.workers.dev/collect \
+curl -X POST https://decision-guardian-telemetry.decision-guardian-telemetry.workers.dev/collect \
   -H "Content-Type: application/json" \
   -d '{
     "event": "run_complete",
@@ -59,7 +59,7 @@ Returns aggregated statistics (public endpoint).
 
 **Request:**
 ```bash
-curl https://decision-guardian-telemetry.iamalizaidi110.workers.dev/stats
+curl https://decision-guardian-telemetry.decision-guardian-telemetry.workers.dev/stats
 ```
 
 **Response:**

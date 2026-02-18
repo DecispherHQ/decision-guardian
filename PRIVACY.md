@@ -121,10 +121,10 @@ export DG_TELEMETRY=0
 - **Privacy validation logic** is reviewable and testable
 
 ### Telemetry Endpoint
-- **URL**: `https://decision-guardian-telemetry.iamalizaidi110.workers.dev/collect`
-- **Stats**: `https://decision-guardian-telemetry.iamalizaidi110.workers.dev/stats` (public, aggregated data)
+- **URL**: `https://decision-guardian-telemetry.decision-guardian-telemetry.workers.dev/collect`
+- **Stats**: `https://decision-guardian-telemetry.decision-guardian-telemetry.workers.dev/stats` (public, aggregated data)
 
-> **Note**: The `iamalizaidi110.workers.dev` subdomain is the official production endpoint for Decision Guardian telemetry, deployed on Cloudflare Workers. The worker source code is open source and available in [`workers/telemetry/`](./workers/telemetry/).
+> **Note**: The `decision-guardian-telemetry.workers.dev` subdomain is the official production endpoint for Decision Guardian telemetry, deployed on Cloudflare Workers. The worker source code is open source and available in [`workers/telemetry/`](./workers/telemetry/).
 
 ## Questions or Concerns?
 

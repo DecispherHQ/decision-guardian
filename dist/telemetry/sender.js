@@ -3,7 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.sendTelemetry = sendTelemetry;
 const payload_1 = require("./payload");
 const privacy_1 = require("./privacy");
-const DEFAULT_ENDPOINT = 'https://decision-guardian-telemetry.iamalizaidi110.workers.dev/collect';
+const DEFAULT_ENDPOINT = 'https://decision-guardian-telemetry.decision-guardian-telemetry.workers.dev/collect';
 const TIMEOUT_MS = 5000;
 function isOptedIn(_source) {
     // Unified telemetry control for both GitHub Actions and CLI via DG_TELEMETRY env

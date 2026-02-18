@@ -4,7 +4,7 @@
  * Tests that the worker endpoint is accessible and responding correctly
  */
 
-const WORKER_URL = process.env.WORKER_URL || 'https://decision-guardian-telemetry.iamalizaidi110.workers.dev';
+const WORKER_URL = process.env.WORKER_URL || 'https://decision-guardian-telemetry.decision-guardian-telemetry.workers.dev';
 const STATS_KEY = process.env.STATS_KEY || 'your-secret-key-here';
 
 async function testStatsEndpoint() {

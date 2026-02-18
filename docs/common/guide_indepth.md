@@ -2147,7 +2147,7 @@ interface TelemetryPayload {
 ### Telemetry Endpoint
 
 Data is sent to our Cloudflare Worker endpoint:
-`https://decision-guardian-telemetry.iamalizaidi110.workers.dev/collect`
+`https://decision-guardian-telemetry.decision-guardian-telemetry.workers.dev/collect`
 
 ### Privacy Policy
 

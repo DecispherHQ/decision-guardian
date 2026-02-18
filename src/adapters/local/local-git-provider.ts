@@ -139,9 +139,7 @@ export class LocalGitProvider implements ISCMProvider {
    *
    * We iterate NUL-separated tokens and robustly handle both shapes.
    */
-  private parseNumstat(
-    output: string,
-  ): Array<{
+  private parseNumstat(output: string): Array<{
     filename: string;
     status: FileDiff['status'];
     additions: number;
