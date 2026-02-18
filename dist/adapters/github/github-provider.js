@@ -196,6 +196,16 @@ class GitHubProvider {
         });
     }
     /**
+     * Post "All Clear" status if previous alerts exist.
+     */
+    async postAllClear() {
+        await this.commentManager.postAllClear({
+            owner: this.owner,
+            repo: this.repo,
+            number: this.pullNumber,
+        });
+    }
+    /**
      * Execute with rate limit handling (Circuit Breaker pattern).
      */
     async executeWithRateLimit(operation, description) {

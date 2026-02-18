@@ -35,9 +35,14 @@ Check flags:
   --branch <base>     Compare against a branch
   --all               Compare all uncommitted changes
   --fail-on-critical  Exit 1 if critical decisions are triggered
+  --fail-on-error     Exit 1 if decision file has parse errors
 
 Template names:
   basic, advanced-rules, security, database, api
+
+Template flags:
+  --list              List all available templates
+  --output, -o <path> Write template to file instead of stdout
 
 Global flags:
   --help, -h          Show this help
@@ -55,8 +60,10 @@ function main(): void {
             branch: { type: 'string' },
             all: { type: 'boolean' },
             'fail-on-critical': { type: 'boolean' },
+            'fail-on-error': { type: 'boolean' },
             template: { type: 'string', short: 't' },
             output: { type: 'string', short: 'o' },
+            o: { type: 'string' },
             list: { type: 'boolean' },
         },
     });
@@ -66,7 +73,7 @@ function main(): void {
         process.exit(0);
     }
 
-    if (values.version) {
+    if (values.version || values.v) {
         console.log(VERSION);
         process.exit(0);
     }
@@ -92,6 +99,7 @@ function main(): void {
                 mode: mode as 'staged' | 'branch' | 'all',
                 baseBranch: values.branch as string | undefined,
                 failOnCritical: !!values['fail-on-critical'],
+                failOnError: !!values['fail-on-error'],
             });
             break;
         }
@@ -103,6 +111,7 @@ function main(): void {
                 mode: mode as 'staged' | 'branch' | 'all',
                 baseBranch: values.branch as string | undefined,
                 failOnCritical: !!values['fail-on-critical'],
+                failOnError: !!values['fail-on-error'],
             });
             break;
         }
@@ -125,7 +134,7 @@ function main(): void {
                 console.log('Usage: decision-guardian template <name> [--output <path>]');
                 process.exit(1);
             }
-            runTemplate(name, values.output as string | undefined);
+            runTemplate(name, (values.output || values.o) as string | undefined);
             break;
         }
 

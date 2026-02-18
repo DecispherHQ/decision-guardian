@@ -37,7 +37,16 @@ Auto-discover and check all `.decispher/` files in the current directory.
 ```bash
 decision-guardian checkall
 decision-guardian checkall --fail-on-critical
+decision-guardian checkall --branch main
+decision-guardian checkall --all
 ```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--staged` | ✅ | Compare staged changes |
+| `--branch <base>` | | Compare against a branch |
+| `--all` | | Compare all uncommitted changes |
+| `--fail-on-critical` | | Exit code 1 if critical decisions triggered |
 
 ### `init`
 
@@ -55,9 +64,15 @@ Creates `.decispher/decisions.md` from the chosen template. Available templates:
 Print or save a template.
 
 ```bash
-decision-guardian template basic           # Print to stdout
-decision-guardian template security -o .   # Write to current dir
+decision-guardian template --list              # List available templates
+decision-guardian template basic               # Print to stdout
+decision-guardian template security --output . # Write to current dir
 ```
+
+| Flag | Short | Description |
+|------|-------|-------------|
+| `--list` | | List all template names |
+| `--output` | `-o` | Write to file instead of stdout |
 
 ## Exit Codes
 
@@ -70,7 +85,7 @@ decision-guardian template security -o .   # Write to current dir
 
 | Variable | Description |
 |----------|-------------|
-| `DG_TELEMETRY` | Set to `1` to opt into anonymous usage telemetry |
+| `DG_TELEMETRY` | Set to `0` or `false` to disable (opt-out of anonymous usage telemetry) |
 | `DG_TELEMETRY_URL` | Override telemetry endpoint |
 
 ## CI/CD Integration
@@ -83,6 +98,13 @@ check-decisions:
   image: node:20
   script:
     - npx decision-guardian check .decispher/decisions.md --branch $CI_MERGE_REQUEST_TARGET_BRANCH_NAME --fail-on-critical
+```
+
+## Global Flags
+
+```bash
+decision-guardian --help     # Show usage and available commands
+decision-guardian --version  # Show installed version
 ```
 
 ## Bundle Size

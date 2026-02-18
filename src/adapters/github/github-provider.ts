@@ -203,6 +203,17 @@ export class GitHubProvider implements ISCMProvider {
     }
 
     /**
+     * Post "All Clear" status if previous alerts exist.
+     */
+    async postAllClear(): Promise<void> {
+        await this.commentManager.postAllClear({
+            owner: this.owner,
+            repo: this.repo,
+            number: this.pullNumber,
+        });
+    }
+
+    /**
      * Execute with rate limit handling (Circuit Breaker pattern).
      */
     private async executeWithRateLimit<T>(

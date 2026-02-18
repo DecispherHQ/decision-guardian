@@ -33,6 +33,9 @@ outputs:
   
   critical_count:
     description: 'Number of critical decision violations'
+  
+  metrics:
+    description: 'JSON object containing metrics about the PR'
 
 runs:
   using: 'node20'

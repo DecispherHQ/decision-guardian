@@ -1,6 +1,6 @@
 # Decision Guardian - Features & Roadmap
 
-## Current Features (v1.0)
+## Current Features (v1.1)
 
 ### Core Features
 
@@ -27,7 +27,7 @@
 #### ✅ Status Management
 | Status | Active? | Description |
 |--------|---------|-------------|
-| `active` | ✅ | Enforced on all PRs |
+| `active` | ✅ | Enforced on all checks |
 | `deprecated` | ❌ | Visible but not enforced |
 | `superseded` | ❌ | Replaced by another decision |
 | `archived` | ❌ | Historical record only |
@@ -118,27 +118,35 @@
 
 ### Version 1.1 (Shipped)
 
-#### 🆕 Decision Templates
-```markdown
-**Template**: security-review
-```
-Pre-built decision templates for common patterns:
-- Security review required
-- Performance-critical code
-- API breaking changes
-- Database migrations
+#### 📦 CLI Package
+`npx decision-guardian` — run checks locally without GitHub Actions:
+- `check <path>` — scan a decision file against local git changes (`--staged`, `--branch`, `--all`)
+- `checkall` — auto-discover all `.decispher/` files
+- `init [--template <name>]` — scaffold `.decispher/` directory
+- `template <name> [-o <path>]` — print or save starter templates
+- `--help` / `--version` — global flags
 
-#### 🔄 Decision Inheritance
-```markdown
-**Extends**: DECISION-BASE-001
-```
-Inherit file patterns and rules from parent decisions.
+#### 📝 5 Decision Templates
+Pre-built, production-ready templates:
+- `basic` — Simple glob patterns and exclusions
+- `advanced-rules` — Regex, JSON path, line-range, boolean logic
+- `security` — Hardcoded credentials detection, auth enforcement
+- `database` — Migration protection, schema locks, connection pool safety
+- `api` — API versioning, endpoint protection, rate limiting
 
-#### 📊 Analytics Dashboard
-- Decision match history
-- Most triggered decisions
-- File hotspots
-- Team insights
+#### 📊 Opt-out Telemetry
+Privacy-first, anonymous usage analytics:
+- Enabled by default (opt-out via `DG_TELEMETRY=0`)
+- Zero PII — no source code, paths, names, or identifiers
+- Runtime blocklist enforced before every send
+- Fire-and-forget (5-second timeout, never blocks the tool)
+
+#### 🏗️ SOLID Architecture Refactor (Internal)
+Platform-agnostic core enabling multi-CI support:
+- `ILogger` and `ISCMProvider` interfaces for dependency inversion
+- `src/adapters/github/` and `src/adapters/local/` for platform isolation
+- Zero `@actions/*` imports in `src/core/`
+- Extensible: adding GitLab/Bitbucket only requires implementing `ISCMProvider`
 
 ---
 

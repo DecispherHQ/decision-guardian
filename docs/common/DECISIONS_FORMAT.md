@@ -25,7 +25,11 @@ Complete reference for the decisions file format used by Decision Guardian.
 
 **Default**: `.decispher/decisions.md`
 
-**Customizable via `decision_file` input**:
+**Customizable via**:
+- **GitHub Action**: `decision_file` input
+- **CLI**: positional argument to `check <path>`, or auto-discovered by `checkall`
+
+**Accepted values**:
 - Single file: `.decispher/decisions.md`
 - Directory: `.decispher/` (auto-discovers all `.md` files recursively)
 
@@ -141,11 +145,11 @@ All other fields have defaults if omitted.
 **Severity**: Critical
 ```
 
-| Severity | Synonyms | Display | Fails PR? |
+| Severity | Synonyms | Display | Fails check? |
 |----------|----------|---------|-----------|
 | `info` | `informational`, `low` | ℹ️ | No |
 | `warning` | `warn`, `medium` | 🟡 | No |
-| `critical` | `error`, `high`, `blocker` | 🔴 | Yes (if `fail_on_critical: true`) |
+| `critical` | `error`, `high`, `blocker` | 🔴 | Yes (if `fail_on_critical: true` / `--fail-on-critical`) |
 
 **Default**: `info`
 

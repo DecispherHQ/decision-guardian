@@ -14,6 +14,7 @@ export interface CheckOptions {
     mode: 'staged' | 'branch' | 'all';
     baseBranch?: string;
     failOnCritical: boolean;
+    failOnError?: boolean;
 }
 
 export async function runCheck(opts: CheckOptions): Promise<void> {
@@ -46,6 +47,11 @@ export async function runCheck(opts: CheckOptions): Promise<void> {
 
         if (parseResult.errors.length > 0) {
             parseResult.errors.forEach(e => logger.error(`Line ${e.line}: ${e.message}`));
+
+            if (opts.failOnError) {
+                logger.error(`Check failed: ${parseResult.errors.length} parse errors found (fail-on-error enabled)`);
+                process.exit(1);
+            }
         }
 
         if (parseResult.decisions.length === 0) {

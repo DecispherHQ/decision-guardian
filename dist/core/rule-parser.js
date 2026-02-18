@@ -81,7 +81,11 @@ class RuleParser {
                 const normalizedWorkspace = path.normalize(workspaceRoot);
                 const normalizedPath = path.normalize(resolvedPath);
                 // Security check: Reject paths outside workspace (Path Traversal protection)
-                if (!resolvedPath.startsWith(normalizedWorkspace + path.sep) && resolvedPath !== normalizedWorkspace) {
+                // We also strictly reject Windows-specific absolute paths (like C:\...) on non-Windows platforms
+                // to prevent them from being interpreted as relative filenames
+                const isWindowsSpecificAbsolute = path.win32.isAbsolute(relPath) && !path.posix.isAbsolute(relPath);
+                const isCrossPlatformAbsolute = process.platform !== 'win32' && isWindowsSpecificAbsolute;
+                if ((!resolvedPath.startsWith(normalizedWorkspace + path.sep) && resolvedPath !== normalizedWorkspace) || isCrossPlatformAbsolute) {
                     return {
                         rules: null,
                         error: `Security Error: External rule file '${relPath}' resolves to a path outside the workspace. ` +
@@ -152,12 +156,13 @@ class RuleParser {
             throw new Error(`Invalid content rule mode: ${rule.mode}`);
         }
         switch (rule.mode) {
-            case 'string':
+            case 'string': {
                 if (!rule.patterns || !Array.isArray(rule.patterns)) {
                     throw new Error('String mode requires patterns array');
                 }
                 break;
-            case 'regex':
+            }
+            case 'regex': {
                 if (!rule.pattern) {
                     throw new Error('Regex mode requires pattern');
                 }
@@ -182,6 +187,7 @@ class RuleParser {
                     throw new Error(`Invalid regex pattern syntax: ${rule.pattern}`);
                 }
                 break;
+            }
             case 'line_range':
                 if (typeof rule.start !== 'number' || typeof rule.end !== 'number') {
                     throw new Error('Line range mode requires start and end numbers');

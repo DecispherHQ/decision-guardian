@@ -32,6 +32,7 @@ export class FileMatcher {
      */
     async findMatchesWithDiffs(fileDiffs: FileDiff[]): Promise<DecisionMatch[]> {
         const activeDecisions = this.normalizedDecisions.filter((d) => d.status === 'active');
+        this.logger.debug(`FileMatcher: ${activeDecisions.length} active decisions loaded.`);
 
         metrics.addDecisionsEvaluated(activeDecisions.length);
 

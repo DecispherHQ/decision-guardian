@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [1.1.0] - Unreleased
+## [1.1.0] - 2026-02-19
 
 ### 🎉 Major Features
 
@@ -60,7 +60,7 @@ Privacy-first, anonymous usage analytics to improve Decision Guardian:
 - **Backend included** - Cloudflare Worker source code provided in `workers/telemetry/`
 
 #### **SOLID Architecture Refactor**
-Complete rewrite to support multiple platforms and extensibility:
+Complete internal rewrite to support multiple platforms and extensibility:
 
 - **Platform-agnostic core** - `src/core/` has **zero** `@actions/*` imports
 - **Dependency Inversion Principle**:
@@ -74,6 +74,8 @@ Complete rewrite to support multiple platforms and extensibility:
   - Core engine handles decision parsing, pattern matching, rule evaluation
   - Adapters handle platform-specific I/O (logging, comments, file retrieval)
   - Entry points (`main.ts`, `cli/index.ts`) orchestrate components
+
+> **Note**: This is an internal architectural refactor. Existing GitHub Action workflows require zero changes.
 
 ---
 
@@ -297,13 +299,13 @@ All backward-compatibility shims have been removed:
     fail_on_critical: true
 ```
 
-**Optional: Enable telemetry**
+**Optional: Disable telemetry** (telemetry is enabled by default)
 ```yaml
 - uses: DecispherHQ/decision-guardian@v1
   with:
     token: ${{ secrets.GITHUB_TOKEN }}
   env:
-    DG_TELEMETRY: '1'  # ← Opt-in to anonymous usage analytics
+    DG_TELEMETRY: '0'  # ← Disable anonymous usage analytics
 ```
 
 #### **For Local Development (NEW)**
@@ -417,7 +419,6 @@ Special thanks to early testers who provided feedback on the CLI UX and template
 ### 🔮 What's Next
 
 #### **Planned for v1.2**
-- **NPM Package Publication** - Publish to npm registry for `npm install -g decision-guardian`
 - **GitLab CI Support** - `GitLabProvider` implementing `ISCMProvider`
 - **Bitbucket Pipelines Support** - `BitbucketProvider` implementing `ISCMProvider`
 - **Enhanced Templates** - More domain-specific templates (frontend, mobile, ML/AI)

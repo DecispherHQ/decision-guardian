@@ -173,6 +173,16 @@ async function run() {
             logger.info('No decision matches found - PR is clear!');
             logger.setOutput('matches_found', '0');
             logger.setOutput('critical_count', '0');
+            if (provider.postAllClear) {
+                logger.startGroup('Updating status to All Clear...');
+                try {
+                    await provider.postAllClear();
+                }
+                catch (error) {
+                    logger.warning(`Failed to post all-clear status: ${error}`);
+                }
+                logger.endGroup();
+            }
         }
         const duration = Date.now() - startTime;
         (0, logger_1.logStructured)(logger, 'info', 'Decision Guardian completed successfully', {
@@ -212,7 +222,6 @@ const ConfigSchema = zod_1.z.object({
         .refine((val) => !val.includes('..'), 'Path traversal not allowed'),
     failOnCritical: zod_1.z.boolean(),
     failOnError: zod_1.z.boolean(),
-    telemetryEnabled: zod_1.z.boolean(),
     token: zod_1.z.string().min(1, 'Token cannot be empty'),
 });
 /**
@@ -223,7 +232,6 @@ function loadConfig() {
         decisionFile: logger.getInput('decision_file') || '.decispher/decisions.md',
         failOnCritical: logger.getBooleanInput('fail_on_critical'),
         failOnError: logger.getBooleanInput('fail_on_error'),
-        telemetryEnabled: logger.getBooleanInput('telemetry_enabled'),
         token: logger.getInput('token', true),
     };
     const result = ConfigSchema.safeParse(rawConfig);
@@ -246,7 +254,7 @@ function loadConfig() {
 /**
  * Report metrics using the decoupled snapshot approach
  */
-function reportMetrics(config) {
+function reportMetrics(_config) {
     const snapshot = metrics_1.metrics.getSnapshot();
     logger.info('=== Performance Metrics ===');
     logger.info(`API Calls: ${snapshot.api_calls}`);
@@ -257,10 +265,8 @@ function reportMetrics(config) {
     logger.info(`Matches Found: ${snapshot.matches_found}`);
     logger.info(`Duration: ${snapshot.duration_ms}ms`);
     logger.setOutput('metrics', JSON.stringify(snapshot));
-    // Send telemetry only if enabled (GitHub Action control)
-    if (config.telemetryEnabled) {
-        (0, sender_1.sendTelemetry)('action', snapshot, version_1.VERSION).catch(() => { });
-    }
+    // Send telemetry (controlled by DG_TELEMETRY env variable)
+    (0, sender_1.sendTelemetry)('action', snapshot, version_1.VERSION).catch(() => { });
 }
 /**
  * Process large PRs using streaming
