@@ -156,7 +156,11 @@ export class RuleEvaluator {
       const allMatchedFiles: string[] = [];
 
       for (const file of matchingFiles) {
-        const contentResult = await this.evaluateContentRules(rule.content_rules, file);
+        const contentResult = await this.evaluateContentRules(
+          rule.content_rules,
+          file,
+          rule.content_match_mode,
+        );
         if (contentResult.matched) {
           allMatchedPatterns.push(...contentResult.matchedPatterns);
           allMatchedFiles.push(file.filename);
@@ -184,11 +188,13 @@ export class RuleEvaluator {
   }
 
   /**
-   * Evaluate content rules against a file diff
+   * Evaluate content rules against a file diff.
+   * contentMatchMode 'all' requires every rule to match (AND); 'any' (default) requires at least one (OR).
    */
   private async evaluateContentRules(
     rules: ContentRule[],
     file: FileDiff,
+    contentMatchMode: 'any' | 'all' = 'any',
   ): Promise<{ matched: boolean; matchedPatterns: string[] }> {
     const allMatchedPatterns: string[] = [];
 
@@ -219,6 +225,9 @@ export class RuleEvaluator {
 
       if (result.matched) {
         allMatchedPatterns.push(...result.matchedPatterns);
+      } else if (contentMatchMode === 'all') {
+        // Short-circuit: one unmatched rule breaks AND logic
+        return { matched: false, matchedPatterns: [] };
       }
     }
 

@@ -57,6 +57,9 @@ export interface FileRule {
 
   /** Content rules to apply to matched files */
   content_rules?: ContentRule[];
+
+  /** How to combine content_rules: 'any' (OR, default) or 'all' (AND) */
+  content_match_mode?: MatchMode;
 }
 
 /**

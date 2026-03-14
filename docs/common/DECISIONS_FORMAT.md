@@ -272,6 +272,7 @@ or
   "type": "file",
   "pattern": "src/**/*.ts",      // Glob pattern
   "exclude": "**/*.test.ts",     // Optional exclusion
+  "content_match_mode": "any",   // Optional: "any" (OR, default) | "all" (AND)
   "content_rules": [...]          // Optional content matching
 }
 ```
@@ -281,6 +282,7 @@ or
 | `type` | `"file"` | Yes | Must be `"file"` |
 | `pattern` | String | Yes | Glob pattern for file matching |
 | `exclude` | String | No | Glob pattern to exclude files |
+| `content_match_mode` | `"any"` \| `"all"` | No | How `content_rules` are combined. `"any"` (default) fires if **any** rule matches; `"all"` fires only when **every** rule matches |
 | `content_rules` | Array | No | Rules to match within file diff |
 
 ---
@@ -421,6 +423,24 @@ Triggers if **either** file changes.
 ```
 
 Triggers only if **both** change.
+
+### AND Logic within a single file rule (`content_match_mode: "all"`)
+
+Use `content_match_mode: "all"` on a `FileRule` to require that **every** entry in `content_rules` matches (AND). The default is `"any"` (OR — fires if at least one rule matches).
+
+```json
+{
+  "type": "file",
+  "pattern": "src/api/**/*.ts",
+  "content_match_mode": "all",
+  "content_rules": [
+    { "mode": "string", "patterns": ["router.post("] },
+    { "mode": "regex", "pattern": "authMiddleware" }
+  ]
+}
+```
+
+Triggers only when a changed file **both** contains `router.post(` **and** matches `authMiddleware`.
 
 ### Nested Logic
 

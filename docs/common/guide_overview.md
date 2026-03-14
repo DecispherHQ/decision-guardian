@@ -447,6 +447,7 @@ or
 - `type`: Always `"file"`
 - `pattern`: Glob pattern (required)
 - `exclude`: Exclusion glob (optional)
+- `content_match_mode`: `"any"` (OR, default) or `"all"` (AND) — controls how multiple `content_rules` are combined (optional)
 - `content_rules`: Content matchers (optional)
 
 ### Content Matching Modes
@@ -530,6 +531,24 @@ Match exact strings in changed lines:
 ```
 
 Triggers only if **both** auth AND database files change.
+
+#### AND Logic within a single file rule (`content_match_mode: "all"`)
+
+By default, multiple `content_rules` on one file rule use OR logic — the file matches if **any** content rule fires. Set `content_match_mode: "all"` to require **every** content rule to match.
+
+```json
+{
+  "type": "file",
+  "pattern": "src/api/**/*.ts",
+  "content_match_mode": "all",
+  "content_rules": [
+    { "mode": "string", "patterns": ["router.post("] },
+    { "mode": "regex", "pattern": "authMiddleware" }
+  ]
+}
+```
+
+Triggers only when a changed file **both** calls `router.post(` **and** references `authMiddleware`. If `content_match_mode` is omitted, it defaults to `"any"` (OR — existing behaviour, fully backward-compatible).
 
 #### OR Logic
 
