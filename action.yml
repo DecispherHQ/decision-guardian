@@ -1,5 +1,5 @@
 name: 'Decision Guardian'
-description: 'Surface architectural decision context on Pull Requests'
+description: 'Surface architectural decision context on Pull Requests. Shift from passive documentation to active enforcement.'
 author: 'Decispher Team'
 
 branding:

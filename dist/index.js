@@ -41062,7 +41062,7 @@ exports.VERSION = void 0;
 /**
  * Version information for Decision Guardian
  */
-exports.VERSION = '1.1.0';
+exports.VERSION = '1.2.0';
 
 
 /***/ }),

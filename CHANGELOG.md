@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.0] - 2026-03-15
+
+### 🐛 Bug Fixes
+
+- **BUG-001**: Fixed all shipped templates using wrong JSON schema (`{files, content}` → `{type, pattern, content_rules}`) — templates now produce matches correctly
+- **BUG-002**: `string` mode now accepts singular `pattern` as alias for `patterns` array instead of silently degrading to glob-only match
+- **BUG-003**: `json_path` mode now correctly detects nested key changes made in-place using context lines alongside diff lines
+- **BUG-004**: `--fail-on-error` now correctly exits 1 on rule parse failures (errors were previously pushed to `warnings[]` instead of `errors[]`)
+- **BUG-006**: `content_rules` array now supports AND logic via `content_match_mode: "all"` (previously always OR'd)
+- **BUG-007**: Documented that content matchers only scan added lines — deleted lines are intentionally not matched
+- **BUG-008**: Duplicate decision IDs now warned and deduplicated — first occurrence wins, subsequent duplicates are skipped
+- **BUG-009**: Decisions with only exclusion patterns (`!`) in `Files` now emit a warning instead of silently never matching
+- **BUG-010**: Decisions with invalid `line_range` (`start > end`) now throw a parse error instead of degrading to glob-only match
+- **BUG-011**: Decisions referencing a missing external rules file now throw a parse error instead of degrading to glob-only match
+- **BUG-012**: Verified telemetry endpoint is reachable and correct
+- **BUG-013**: Empty or whitespace-only decision files now emit a warning instead of silently succeeding
+
+### ✨ New Features
+
+- **BUG-005**: Added `content_match_mode: "any" | "all"` to `FileRule` — enables AND logic across `content_rules` within a single file rule (default: `"any"`, no breaking change)
+
+---
+
 ## [1.1.0] - 2026-02-19
 
 ### 🎉 Major Features
