@@ -252,7 +252,18 @@ export class DecisionParser {
 
     const files = this.extractFilesList(content);
 
+    // Warn when every Files pattern is an exclusion — the decision would match
+    // no files at all without at least one include pattern.
+    if (files.length > 0 && files.every(f => f.startsWith('!'))) {
+      warnings.push(
+        `${id}: All "Files" patterns are exclusions (start with "!"). ` +
+        `The decision will match every file except those excluded. ` +
+        `Add at least one include pattern (e.g. "**") if that is intentional.`,
+      );
+    }
+
     const ruleResult = await this.ruleParser.extractRules(content, sourceFile);
+
     if (ruleResult.error) {
       warnings.push(`${id}: ${ruleResult.error}`);
     }

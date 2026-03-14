@@ -89,4 +89,41 @@ describe('PatternTrie', () => {
         expect(candidates.has(d1)).toBe(true);
         expect(candidates.has(d2)).toBe(true);
     });
+
+    // ── BUG-009 Regression — exclude-only Files patterns ─────────────────────
+
+    describe('BUG-009 Regression — exclude-only Files patterns', () => {
+        it('should return exclude-only decisions as candidates for every file', () => {
+            // Decision whose entire Files list is exclusions — it should fire on every file
+            // that is NOT excluded. The trie must return it as a candidate so matchesDecision()
+            // can apply the exclusion gate.
+            const dExcludeOnly = createDecision('EXCL', ['!src/**/*.test.ts']);
+            const trie = new PatternTrie([dExcludeOnly]);
+
+            // A production file — NOT excluded — must be a candidate
+            const prodCandidates = trie.findCandidates('src/api/controller.ts');
+            expect(prodCandidates.has(dExcludeOnly)).toBe(true);
+
+            // A test file — excluded — is still returned as a candidate by the trie;
+            // the real exclusion happens in matchesDecision(), not in findCandidates().
+            const testCandidates = trie.findCandidates('src/api/controller.test.ts');
+            expect(testCandidates.has(dExcludeOnly)).toBe(true);
+        });
+
+        it('should not add exclude-only decisions to candidates when files list is empty', () => {
+            const dNoFiles = createDecision('NOFILES', []);
+            const trie = new PatternTrie([dNoFiles]);
+
+            const candidates = trie.findCandidates('src/anything.ts');
+            expect(candidates.has(dNoFiles)).toBe(false);
+        });
+
+        it('should still index include patterns normally when mixed with exclusions', () => {
+            const dMixed = createDecision('MIXED', ['src/**/*.ts', '!src/**/*.test.ts']);
+            const trie = new PatternTrie([dMixed]);
+
+            const candidates = trie.findCandidates('src/api/controller.ts');
+            expect(candidates.has(dMixed)).toBe(true);
+        });
+    });
 });
