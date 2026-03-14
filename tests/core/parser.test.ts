@@ -96,7 +96,11 @@ some random text
                 /all.*files.*patterns.*exclusions/i.test(w)
             );
             expect(exclWarnings).toHaveLength(0);
+        });
+    });
+
     // ── BUG-008 Regression — duplicate decision IDs ───────────────────────────
+
 
     describe('BUG-008 Regression — duplicate decision ID deduplication', () => {
         it('should keep only the first occurrence and emit a warning when two blocks share the same ID', async () => {
