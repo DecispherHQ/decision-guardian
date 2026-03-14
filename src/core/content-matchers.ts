@@ -71,7 +71,10 @@ export class ContentMatchers {
       return { matched: false, matchedPatterns: [] };
     }
 
-    const changedContent = this.getChangedLines(fileDiff.patch, rule.match_deleted_lines ?? false).join('\n');
+    const changedContent = this.getChangedLines(
+      fileDiff.patch,
+      rule.match_deleted_lines ?? false,
+    ).join('\n');
     const MAX_CONTENT_SIZE = 1024 * 1024;
 
     if (changedContent.length > MAX_CONTENT_SIZE) {
@@ -169,7 +172,10 @@ export class ContentMatchers {
     rule: ContentRule,
     fileDiff: FileDiff,
   ): { matched: boolean; matchedPatterns: string[] } {
-    const changedLineNumbers = this.extractChangedLineNumbers(fileDiff.patch, rule.match_deleted_lines ?? false);
+    const changedLineNumbers = this.extractChangedLineNumbers(
+      fileDiff.patch,
+      rule.match_deleted_lines ?? false,
+    );
 
     const matched = changedLineNumbers.some(
       (lineNum) => lineNum >= rule.start! && lineNum <= rule.end!,

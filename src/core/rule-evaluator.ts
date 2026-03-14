@@ -65,12 +65,12 @@ export class RuleEvaluator {
       r.status === 'fulfilled'
         ? r.value
         : {
-          matched: false,
-          matchedPatterns: [],
-          matchedFiles: [],
-          ruleDepth: depth + 1,
-          error: `Condition evaluation failed: ${r.reason}`,
-        },
+            matched: false,
+            matchedPatterns: [],
+            matchedFiles: [],
+            ruleDepth: depth + 1,
+            error: `Condition evaluation failed: ${r.reason}`,
+          },
     );
 
     const matched =

@@ -100,4 +100,13 @@ This document tracks identified bugs, their severity, description, status, and t
 - **Root Cause**: In `rule-parser.ts`, inverted ranges prompted an error to be thrown instead of coercing or fixing the values.
 - **Resolution**: `validateContentRule()` now automatically swaps `start` and `end` if `start > end`, allowing the line range rule to function correctly rather than degrading to a false positive match.
 
+### [BUG-011] Missing external rules file degrades to glob-only match
+- **Severity**: 🟡 Reliability
+- **Affects**: CLI, GitHub Action
+- **Status**: ✅ Fixed
+- **Branch**: `fix/BUG-011`
+- **Description**: When an external rules file reference (`**Rules**: [link](./rules/file.json)`) points to a nonexistent file or fails to parse, `extractRules()` returned `{rules: null, error: "Failed to load..."}`. The error was caught in `parseBlock()` and pushed into the `warnings` array. The decision loaded with `rules: undefined`, and consequently fired as a glob-only match on every file matching the `Files` list rather than gracefully failing.
+- **Root Cause**: In `parseBlock()` (inside `src/core/parser.ts`), missing external rules returned an error that was appended to `warnings` instead of throwing an error or being added to the `errors` array, causing it to fall back to an active decision without rules.
+- **Resolution**: `parseBlock()` now throws an error when `ruleResult.error` is present. This correctly skips adding the decision and routes the error message to the `errors` array, preventing false-positive matches and ensuring `--fail-on-error` can catch it. Added one regression test to `tests/core/parser.test.ts`.
+
 ---

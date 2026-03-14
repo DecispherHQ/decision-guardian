@@ -199,5 +199,35 @@ some random text
             expect(dupWarnings).toHaveLength(0);
         });
     });
+
+    describe('BUG-011 Regression — missing external rules', () => {
+        it('should emit an error and drop the decision when an external rules file fails to load', async () => {
+            const content = `
+<!-- DECISION-EXT-001 -->
+## Decision: External missing
+**Status**: Active
+**Severity**: Critical
+**Date**: 2024-01-01
+
+**Files**:
+- \`src/**/*.ts\`
+
+**Rules**: [rules](./rules/NONEXISTENT.json)
+            `;
+
+            const result = await parser.parseContent(content, 'test.md');
+
+            // The decision should NOT be added to decisions (it shouldn't degrade to glob-only)
+            expect(result.decisions).toHaveLength(0);
+
+            // An error should be emitted, not a warning
+            expect(result.errors).toHaveLength(1);
+            expect(result.errors[0].message).toMatch(/DECISION-EXT-001: Failed to load external rules/i);
+
+            // Warnings array should not contain this failure
+            const extWarnings = result.warnings.filter(w => /Failed to load external rules/i.test(w));
+            expect(extWarnings).toHaveLength(0);
+        });
+    });
 });
 
