@@ -11,15 +11,40 @@
 **Rules**:
 ```json
 {
-  "match": "any",
+  "match_mode": "any",
   "conditions": [
     {
-      "files": ["src/**/*.ts", "src/**/*.js", "config/**/*"],
-      "content": {
-        "mode": "regex",
-        "pattern": "(api[_-]?key|secret|password|token|private[_-]?key)\\s*[:=]\\s*['\"][^'\"]{8,}['\"]",
-        "flags": "i"
-      }
+      "type": "file",
+      "pattern": "src/**/*.ts",
+      "content_rules": [
+        {
+          "mode": "regex",
+          "pattern": "(api[_-]?key|secret|password|token|private[_-]?key)\\s*[:=]\\s*['\"][^'\"]{8,}['\"]",
+          "flags": "i"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "pattern": "src/**/*.js",
+      "content_rules": [
+        {
+          "mode": "regex",
+          "pattern": "(api[_-]?key|secret|password|token|private[_-]?key)\\s*[:=]\\s*['\"][^'\"]{8,}['\"]",
+          "flags": "i"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "pattern": "config/**/*",
+      "content_rules": [
+        {
+          "mode": "regex",
+          "pattern": "(api[_-]?key|secret|password|token|private[_-]?key)\\s*[:=]\\s*['\"][^'\"]{8,}['\"]",
+          "flags": "i"
+        }
+      ]
     }
   ]
 }
@@ -42,14 +67,27 @@ Hardcoded secrets must never appear in source code. Use environment variables or
 **Rules**:
 ```json
 {
-  "match": "any",
+  "match_mode": "any",
   "conditions": [
     {
-      "files": ["src/routes/**/*.ts", "src/api/**/*.ts"],
-      "content": {
-        "mode": "string",
-        "patterns": ["router.get(", "router.post(", "router.put(", "router.delete(", "app.get(", "app.post("]
-      }
+      "type": "file",
+      "pattern": "src/routes/**/*.ts",
+      "content_rules": [
+        {
+          "mode": "string",
+          "patterns": ["router.get(", "router.post(", "router.put(", "router.delete(", "app.get(", "app.post("]
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "pattern": "src/api/**/*.ts",
+      "content_rules": [
+        {
+          "mode": "string",
+          "patterns": ["router.get(", "router.post(", "router.put(", "router.delete(", "app.get(", "app.post("]
+        }
+      ]
     }
   ]
 }
@@ -72,14 +110,17 @@ All route handlers must use the authentication middleware. Changes to route file
 **Rules**:
 ```json
 {
-  "match": "any",
+  "match_mode": "any",
   "conditions": [
     {
-      "files": ["package.json"],
-      "content": {
-        "mode": "json_path",
-        "paths": ["dependencies.jsonwebtoken", "dependencies.bcrypt", "dependencies.helmet", "dependencies.cors"]
-      }
+      "type": "file",
+      "pattern": "package.json",
+      "content_rules": [
+        {
+          "mode": "json_path",
+          "paths": ["dependencies.jsonwebtoken", "dependencies.bcrypt", "dependencies.helmet", "dependencies.cors"]
+        }
+      ]
     }
   ]
 }

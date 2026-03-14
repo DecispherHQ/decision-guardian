@@ -24,14 +24,27 @@ V1 API endpoints are frozen. New features go to V2. Modifying V1 routes breaks e
 **Rules**:
 ```json
 {
-  "match": "any",
+  "match_mode": "any",
   "conditions": [
     {
-      "files": ["src/api/**/*.ts", "src/routes/**/*.ts"],
-      "content": {
-        "mode": "string",
-        "patterns": ["router.get(", "router.post(", "app.get(", "app.post("]
-      }
+      "type": "file",
+      "pattern": "src/api/**/*.ts",
+      "content_rules": [
+        {
+          "mode": "string",
+          "patterns": ["router.get(", "router.post(", "app.get(", "app.post("]
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "pattern": "src/routes/**/*.ts",
+      "content_rules": [
+        {
+          "mode": "string",
+          "patterns": ["router.get(", "router.post(", "app.get(", "app.post("]
+        }
+      ]
     }
   ]
 }
@@ -53,14 +66,17 @@ All public endpoints must include rate limiting. New endpoints require load test
 **Rules**:
 ```json
 {
-  "match": "any",
+  "match_mode": "any",
   "conditions": [
     {
-      "files": ["src/api/**/*.ts"],
-      "content": {
-        "mode": "string",
-        "patterns": ["res.json(", "res.send(", "response.json("]
-      }
+      "type": "file",
+      "pattern": "src/api/**/*.ts",
+      "content_rules": [
+        {
+          "mode": "string",
+          "patterns": ["res.json(", "res.send(", "response.json("]
+        }
+      ]
     }
   ]
 }

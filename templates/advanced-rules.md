@@ -10,22 +10,28 @@
 **Rules**:
 ```json
 {
-  "match": "any",
+  "match_mode": "any",
   "conditions": [
     {
-      "files": ["config/**/*.json"],
-      "content": {
-        "mode": "json_path",
-        "paths": ["database.host", "database.port", "database.password"]
-      }
+      "type": "file",
+      "pattern": "config/**/*.json",
+      "content_rules": [
+        {
+          "mode": "json_path",
+          "paths": ["database.host", "database.port", "database.password"]
+        }
+      ]
     },
     {
-      "files": ["config/**/*.yml"],
-      "content": {
-        "mode": "regex",
-        "pattern": "(password|secret|api_key)\\s*[:=]",
-        "flags": "i"
-      }
+      "type": "file",
+      "pattern": "config/**/*.yml",
+      "content_rules": [
+        {
+          "mode": "regex",
+          "pattern": "(password|secret|api_key)\\s*[:=]",
+          "flags": "i"
+        }
+      ]
     }
   ]
 }
@@ -47,15 +53,18 @@ All config changes affecting database credentials must be reviewed.
 **Rules**:
 ```json
 {
-  "match": "all",
+  "match_mode": "all",
   "conditions": [
     {
-      "files": ["src/**/*.ts"],
-      "content": {
-        "mode": "line_range",
-        "start": 1,
-        "end": 5
-      }
+      "type": "file",
+      "pattern": "src/**/*.ts",
+      "content_rules": [
+        {
+          "mode": "line_range",
+          "start": 1,
+          "end": 5
+        }
+      ]
     }
   ]
 }
@@ -77,14 +86,17 @@ Source files must contain license headers in the first 5 lines.
 **Rules**:
 ```json
 {
-  "match": "any",
+  "match_mode": "any",
   "conditions": [
     {
-      "files": ["src/**/*.ts"],
-      "content": {
-        "mode": "string",
-        "patterns": ["@deprecated", "TODO: remove"]
-      }
+      "type": "file",
+      "pattern": "src/**/*.ts",
+      "content_rules": [
+        {
+          "mode": "string",
+          "patterns": ["@deprecated", "TODO: remove"]
+        }
+      ]
     }
   ]
 }
