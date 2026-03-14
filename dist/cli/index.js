@@ -8864,33 +8864,37 @@ class ContentMatchers {
     }
     /**
      * JSON path mode - check if specific JSON keys changed
-     *
-     * Improved heuristic: all keys in the dotted path must appear as
-     * `"key"\s*:` in the changed lines, and each subsequent key must
-     * appear at a line number >= the previous key's line number.
-     * This enforces hierarchical ordering without needing the full file.
      */
     matchJsonPath(rule, fileDiff) {
-        const changedLines = this.getChangedLinesWithNumbers(fileDiff.patch);
+        // Lines that include context (normal) lines so ancestor keys are visible
+        // even when only a leaf value was edited in-place.
+        const allLines = this.getChangedLinesWithContext(fileDiff.patch);
         const matchedPatterns = [];
         for (const jsonPath of rule.paths || []) {
             const keys = jsonPath.split('.');
             let minLine = -1;
             let allKeysFound = true;
-            for (const key of keys) {
+            let leafIsAdded = false;
+            for (let i = 0; i < keys.length; i++) {
+                const key = keys[i];
+                const isLeaf = i === keys.length - 1;
                 const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                 const keyRegex = new RegExp(`"${escapedKey}"\\s*:`);
-                // Find the first matching line at or after minLine
-                const match = changedLines.find((line) => line.lineNumber >= minLine && keyRegex.test(line.content));
+                // Find the first line (added OR context) at or after minLine that
+                // contains the key.
+                const match = allLines.find((line) => line.lineNumber >= minLine && keyRegex.test(line.content));
                 if (match) {
                     minLine = match.lineNumber;
+                    if (isLeaf) {
+                        leafIsAdded = match.isAdded;
+                    }
                 }
                 else {
                     allKeysFound = false;
                     break;
                 }
             }
-            if (allKeysFound) {
+            if (allKeysFound && leafIsAdded) {
                 matchedPatterns.push(jsonPath);
             }
         }
@@ -9006,6 +9010,55 @@ ${patch}`;
         }
         catch (error) {
             (0, logger_1.logStructured)(this.logger, 'warning', `[Parsing] Failed to parse diff content with line numbers`, {
+                error: String(error),
+            });
+            return [];
+        }
+    }
+    /**
+     * Extract both added (+) and context lines with their new-file line numbers
+     * and an `isAdded` flag.  Used by matchJsonPath so that ancestor keys which
+     * appear as unchanged context lines are still visible when scanning for a
+     * nested path whose leaf value was edited in-place (BUG-003).
+     */
+    getChangedLinesWithContext(patch) {
+        if (!patch)
+            return [];
+        try {
+            const fullDiff = `diff --git a/file b/file
+--- a/file
++++ b/file
+${patch}`;
+            const parsed = (0, parse_diff_1.default)(fullDiff);
+            const lines = [];
+            for (const file of parsed) {
+                for (const chunk of file.chunks) {
+                    for (const change of chunk.changes) {
+                        if (change.type === 'add' && change.ln != null) {
+                            // Added line — strip the leading '+'
+                            lines.push({
+                                content: change.content.substring(1),
+                                lineNumber: change.ln,
+                                isAdded: true,
+                            });
+                        }
+                        else if (change.type === 'normal' && change.ln2 != null) {
+                            // Context (unchanged) line — strip the leading ' '
+                            lines.push({
+                                content: change.content.substring(1),
+                                lineNumber: change.ln2,
+                                isAdded: false,
+                            });
+                        }
+                        // Deleted lines are intentionally excluded — they no longer
+                        // exist in the new file and should not anchor path matching.
+                    }
+                }
+            }
+            return lines;
+        }
+        catch (error) {
+            (0, logger_1.logStructured)(this.logger, 'warning', `[Parsing] Failed to parse diff content with context lines`, {
                 error: String(error),
             });
             return [];
