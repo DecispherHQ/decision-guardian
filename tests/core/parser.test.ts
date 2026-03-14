@@ -48,4 +48,104 @@ some random text
         expect(result.decisions[0].id).toBe('DECISION-001');
         expect(result.decisions[1].id).toBe('DECISION-002');
     });
+
+    // ── BUG-008 Regression — duplicate decision IDs ───────────────────────────
+
+    describe('BUG-008 Regression — duplicate decision ID deduplication', () => {
+        it('should keep only the first occurrence and emit a warning when two blocks share the same ID', async () => {
+            const content = `
+<!-- DECISION-DUP-001 -->
+## Decision: First version (Critical)
+**Status**: Active
+**Severity**: Critical
+**Date**: 2024-01-01
+
+<!-- DECISION-DUP-001 -->
+## Decision: Second version (Warning)
+**Status**: Active
+**Severity**: Warning
+**Date**: 2024-01-01
+            `;
+
+            const result = await parser.parseContent(content, 'dup-test.md');
+
+            // Only one decision should survive
+            expect(result.decisions).toHaveLength(1);
+            expect(result.decisions[0].severity).toBe('critical');
+
+            // A warning must have been emitted
+            expect(result.warnings.length).toBeGreaterThan(0);
+            const dupWarning = result.warnings.find(w => w.includes('DECISION-DUP-001'));
+            expect(dupWarning).toBeDefined();
+            expect(dupWarning).toMatch(/duplicate decision id/i);
+        });
+
+        it('should keep only the first when three blocks share the same ID', async () => {
+            const content = `
+<!-- DECISION-TRIPLE-001 -->
+## Decision: Version A
+**Status**: Active
+**Severity**: Critical
+**Date**: 2024-01-01
+
+<!-- DECISION-TRIPLE-001 -->
+## Decision: Version B
+**Status**: Active
+**Severity**: Warning
+**Date**: 2024-01-01
+
+<!-- DECISION-TRIPLE-001 -->
+## Decision: Version C
+**Status**: Active
+**Severity**: Info
+**Date**: 2024-01-01
+            `;
+
+            const result = await parser.parseContent(content, 'triple-test.md');
+
+            expect(result.decisions).toHaveLength(1);
+            expect(result.decisions[0].title).toBe('Version A');
+            // Two warnings — one for each duplicate
+            const dupWarnings = result.warnings.filter(w => w.includes('DECISION-TRIPLE-001'));
+            expect(dupWarnings).toHaveLength(2);
+        });
+
+        it('should not affect decisions with unique IDs', async () => {
+            const content = `
+<!-- DECISION-UNIQUE-001 -->
+## Decision: Alpha
+**Status**: Active
+**Severity**: Critical
+**Date**: 2024-01-01
+
+<!-- DECISION-UNIQUE-002 -->
+## Decision: Beta
+**Status**: Active
+**Severity**: Warning
+**Date**: 2024-01-01
+            `;
+
+            const result = await parser.parseContent(content, 'unique-test.md');
+
+            expect(result.decisions).toHaveLength(2);
+            const dupWarnings = result.warnings.filter(w => /duplicate decision id/i.test(w));
+            expect(dupWarnings).toHaveLength(0);
+        });
+
+        it('should emit no duplicate warning for a single decision', async () => {
+            const content = `
+<!-- DECISION-SOLO-001 -->
+## Decision: Solo
+**Status**: Active
+**Severity**: Info
+**Date**: 2024-01-01
+            `;
+
+            const result = await parser.parseContent(content, 'solo-test.md');
+
+            expect(result.decisions).toHaveLength(1);
+            const dupWarnings = result.warnings.filter(w => /duplicate decision id/i.test(w));
+            expect(dupWarnings).toHaveLength(0);
+        });
+    });
 });

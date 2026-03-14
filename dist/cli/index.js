@@ -9578,7 +9578,22 @@ class DecisionParser {
                 });
             }
         }
-        return { decisions, errors, warnings };
+        // Deduplicate by ID — keep first occurrence, warn on subsequent duplicates
+        const seenIds = new Map(); // id -> line number of first occurrence
+        const deduped = [];
+        for (const decision of decisions) {
+            const firstLine = seenIds.get(decision.id);
+            if (firstLine !== undefined) {
+                warnings.push(`Duplicate decision ID "${decision.id}" at line ${decision.lineNumber} ` +
+                    `(first seen at line ${firstLine} in ${sourceFile}). ` +
+                    `Only the first occurrence will be evaluated; the duplicate is ignored.`);
+            }
+            else {
+                seenIds.set(decision.id, decision.lineNumber);
+                deduped.push(decision);
+            }
+        }
+        return { decisions: deduped, errors, warnings };
     }
     /**
      * Split content into decision blocks
