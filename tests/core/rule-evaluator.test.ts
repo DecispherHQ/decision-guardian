@@ -249,4 +249,85 @@ describe('BUG-005 Regression — content_match_mode AND/OR logic', () => {
             expect(result.matched).toBe(false);
         });
     });
+
+    // ── full_file regression ──────────────────────────────────────────────────
+    // full_file returns { matched: true, matchedPatterns: [] }.
+    // Previously the final `matched: allMatchedPatterns.length > 0` check caused
+    // a false negative (matched = false) even when the rule fired correctly.
+
+    describe('full_file mode — matched must be true even with empty matchedPatterns', () => {
+        it('fires with content_match_mode: "any" (default OR) when the only rule is full_file', async () => {
+            const fileDiffs = [makeFileDiff('src/api/routes.ts', 'anything')];
+
+            const rules = {
+                type: 'file' as const,
+                pattern: 'src/api/**/*.ts',
+                // no content_match_mode → defaults to 'any'
+                content_rules: [{ mode: 'full_file' as const }],
+            };
+
+            const result = await evaluator.evaluate(rules as never, fileDiffs);
+
+            // full_file always matches any changed file — must be true
+            expect(result.matched).toBe(true);
+            expect(result.matchedFiles).toContain('src/api/routes.ts');
+        });
+
+        it('fires with content_match_mode: "all" when ALL rules are full_file', async () => {
+            const fileDiffs = [makeFileDiff('src/api/routes.ts', 'anything')];
+
+            const rules = {
+                type: 'file' as const,
+                pattern: 'src/api/**/*.ts',
+                content_match_mode: 'all' as const,
+                content_rules: [
+                    { mode: 'full_file' as const },
+                    { mode: 'full_file' as const },
+                ],
+            };
+
+            const result = await evaluator.evaluate(rules as never, fileDiffs);
+
+            expect(result.matched).toBe(true);
+        });
+
+        it('fires with content_match_mode: "all" when full_file AND string both match', async () => {
+            const fileDiffs = [makeFileDiff('src/api/routes.ts', 'router.post("/endpoint", handler);')];
+
+            const rules = {
+                type: 'file' as const,
+                pattern: 'src/api/**/*.ts',
+                content_match_mode: 'all' as const,
+                content_rules: [
+                    { mode: 'full_file' as const },
+                    { mode: 'string' as const, patterns: ['router.post('] },
+                ],
+            };
+
+            const result = await evaluator.evaluate(rules as never, fileDiffs);
+
+            // AND: full_file ✅ + string match ✅ → fires
+            expect(result.matched).toBe(true);
+            expect(result.matchedFiles).toContain('src/api/routes.ts');
+        });
+
+        it('does NOT fire with content_match_mode: "all" when full_file matches but string does not', async () => {
+            const fileDiffs = [makeFileDiff('src/api/routes.ts', 'const x = 1;')];
+
+            const rules = {
+                type: 'file' as const,
+                pattern: 'src/api/**/*.ts',
+                content_match_mode: 'all' as const,
+                content_rules: [
+                    { mode: 'full_file' as const },
+                    { mode: 'string' as const, patterns: ['router.post('] },
+                ],
+            };
+
+            const result = await evaluator.evaluate(rules as never, fileDiffs);
+
+            // AND: full_file ✅ but string ❌ → short-circuits to false
+            expect(result.matched).toBe(false);
+        });
+    });
 });

@@ -65,12 +65,12 @@ export class RuleEvaluator {
       r.status === 'fulfilled'
         ? r.value
         : {
-            matched: false,
-            matchedPatterns: [],
-            matchedFiles: [],
-            ruleDepth: depth + 1,
-            error: `Condition evaluation failed: ${r.reason}`,
-          },
+          matched: false,
+          matchedPatterns: [],
+          matchedFiles: [],
+          ruleDepth: depth + 1,
+          error: `Condition evaluation failed: ${r.reason}`,
+        },
     );
 
     const matched =
@@ -197,6 +197,7 @@ export class RuleEvaluator {
     contentMatchMode: 'any' | 'all' = 'any',
   ): Promise<{ matched: boolean; matchedPatterns: string[] }> {
     const allMatchedPatterns: string[] = [];
+    let anyMatched = false;
 
     for (const rule of rules) {
       let result: { matched: boolean; matchedPatterns: string[] };
@@ -224,6 +225,7 @@ export class RuleEvaluator {
       }
 
       if (result.matched) {
+        anyMatched = true;
         allMatchedPatterns.push(...result.matchedPatterns);
       } else if (contentMatchMode === 'all') {
         // Short-circuit: one unmatched rule breaks AND logic
@@ -232,7 +234,7 @@ export class RuleEvaluator {
     }
 
     return {
-      matched: allMatchedPatterns.length > 0,
+      matched: anyMatched,
       matchedPatterns: allMatchedPatterns.sort(),
     };
   }

@@ -136,3 +136,59 @@ Any change to the authentication configuration file requires security review. Th
 ### Context
 
 This decision demonstrates backward compatibility with the original file-based matching. Any changes to legacy code or database migrations should be reviewed carefully.
+
+---
+
+<!-- DECISION-005 -->
+## Decision: Authenticated Routes — AND Content Logic
+
+**Status**: Active
+**Date**: 2024-04-01
+**Severity**: Critical
+
+**Rules**:
+```json
+{
+  "match_mode": "all",
+  "conditions": [
+    {
+      "type": "file",
+      "pattern": "src/api/**/*.ts",
+      "content_match_mode": "all",
+      "content_rules": [
+        {
+          "mode": "string",
+          "patterns": ["router.post(", "router.put(", "router.delete("]
+        },
+        {
+          "mode": "regex",
+          "pattern": "authMiddleware|authenticate|requireAuth"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "pattern": "src/middleware/auth.ts",
+      "content_rules": [
+        {
+          "mode": "full_file"
+        }
+      ]
+    }
+  ]
+}
+```
+
+### Context
+
+Demonstrates **both** match modes together:
+
+- **`match_mode: "all"` (outer)** — requires BOTH conditions to be satisfied simultaneously:
+  1. An API file with AND content logic (see below)
+  2. The auth middleware file itself being changed in the same PR
+
+- **`content_match_mode: "all"` (inner, on the API file rule)** — requires the changed API file to BOTH:
+  - Define a mutating route (`router.post(`, `router.put(`, or `router.delete(`)
+  - Reference auth middleware in the same diff
+
+This pattern catches PRs that add unguarded routes at the same time auth middleware is being modified — a scenario that warrants careful review.

@@ -9892,6 +9892,7 @@ class RuleEvaluator {
      */
     async evaluateContentRules(rules, file, contentMatchMode = 'any') {
         const allMatchedPatterns = [];
+        let anyMatched = false;
         for (const rule of rules) {
             let result;
             switch (rule.mode) {
@@ -9916,6 +9917,7 @@ class RuleEvaluator {
                 }
             }
             if (result.matched) {
+                anyMatched = true;
                 allMatchedPatterns.push(...result.matchedPatterns);
             }
             else if (contentMatchMode === 'all') {
@@ -9924,7 +9926,7 @@ class RuleEvaluator {
             }
         }
         return {
-            matched: allMatchedPatterns.length > 0,
+            matched: anyMatched,
             matchedPatterns: allMatchedPatterns.sort(),
         };
     }
@@ -10085,6 +10087,9 @@ class RuleParser {
         }
         if (rule.content_match_mode && !['any', 'all'].includes(rule.content_match_mode)) {
             throw new Error(`Invalid content_match_mode: "${rule.content_match_mode}". Must be "any" or "all"`);
+        }
+        if (!rule.content_match_mode) {
+            rule.content_match_mode = 'any';
         }
         if (rule.content_rules && Array.isArray(rule.content_rules)) {
             for (const contentRule of rule.content_rules) {

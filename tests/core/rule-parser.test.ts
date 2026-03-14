@@ -633,6 +633,30 @@ This is a decision without rules.
             expect(result.rules).toBeDefined();
             expect(result.rules?.conditions).toHaveLength(1);
         });
+
+        it('should default content_match_mode to "any" when missing', async () => {
+            const content = `
+## DECISION-BUG005-E
+**Rules**: \`\`\`json
+{
+    "type": "file",
+    "pattern": "src/**/*.ts",
+    "content_rules": [
+        { "mode": "string", "patterns": ["router.post("] }
+    ]
+}
+\`\`\`
+            `;
+
+            const result = await parser.extractRules(content, path.join(workspaceDir, 'decisions.md'));
+
+            expect(result.error).toBeUndefined();
+            expect(result.rules).toBeDefined();
+
+            // When no conditions structure is used, rules itself is the FileRule
+            const rule = result.rules as unknown as { content_match_mode: string };
+            expect(rule.content_match_mode).toBe('any');
+        });
     });
 });
 
