@@ -9650,14 +9650,14 @@ class DecisionParser {
         const files = this.extractFilesList(content);
         // Warn when every Files pattern is an exclusion — the decision would match
         // no files at all without at least one include pattern.
-        if (files.length > 0 && files.every(f => f.startsWith('!'))) {
+        if (files.length > 0 && files.every((f) => f.startsWith('!'))) {
             warnings.push(`${id}: All "Files" patterns are exclusions (start with "!"). ` +
                 `The decision will match every file except those excluded. ` +
                 `Add at least one include pattern (e.g. "**") if that is intentional.`);
         }
         const ruleResult = await this.ruleParser.extractRules(content, sourceFile);
         if (ruleResult.error) {
-            warnings.push(`${id}: ${ruleResult.error}`);
+            throw new Error(`${id}: ${ruleResult.error}`);
         }
         const contextMatch = content.match(/###\s*Context\s*\n([\s\S]+?)(?=\n---+|\n<!--|$)/);
         const context = contextMatch ? contextMatch[1].trim() : '';
@@ -10242,7 +10242,7 @@ class PatternTrie {
     constructor(decisions) {
         this.root = this.createNode();
         for (const decision of decisions) {
-            const includePatterns = decision.files.filter(p => !p.startsWith('!'));
+            const includePatterns = decision.files.filter((p) => !p.startsWith('!'));
             if (includePatterns.length === 0 && decision.files.length > 0) {
                 // Decision has only exclusion patterns — insert under ** so it receives candidates
                 // for every file. The exclusion logic in matchesDecision() still applies.
