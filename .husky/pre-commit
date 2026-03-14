@@ -1,0 +1,16 @@
+#!/usr/bin/env sh
+
+echo "🔨 [pre-commit] Bundling dist for GitHub Action & CLI..."
+
+# Build the GitHub Action bundle (dist/index.js)
+npm run bundle || { echo "❌ bundle failed — commit aborted"; exit 1; }
+
+# Build the CLI bundle (dist/cli/index.js)
+npm run build:cli || { echo "❌ build:cli failed — commit aborted"; exit 1; }
+
+# Stage the updated dist files so they are included in this commit.
+# Git respects .gitignore, so only the 4 tracked ncc bundles are staged —
+# the tsc-compiled intermediates (dist/core/, dist/adapters/, etc.) are ignored.
+git add dist/
+
+echo "✅ [pre-commit] dist bundles are up to date and staged."
