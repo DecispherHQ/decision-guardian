@@ -40473,7 +40473,10 @@ class RuleParser {
                     throw new Error('Line range mode requires start and end numbers');
                 }
                 if (rule.start > rule.end) {
-                    throw new Error('Line range start must be <= end');
+                    // BUG-010 fix: Auto-correct inverted line range instead of throwing an error
+                    const temp = rule.start;
+                    rule.start = rule.end;
+                    rule.end = temp;
                 }
                 break;
             case 'json_path':

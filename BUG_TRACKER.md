@@ -90,3 +90,14 @@ This document tracks identified bugs, their severity, description, status, and t
 - **Resolution**: When all patterns for a decision are exclusions, the trie constructor now inserts it under `**` (match-all), ensuring `findCandidates()` returns it as a candidate for every file. The existing exclusion gate in `matchesDecision()` (`matcher.ts`) then applies the `!`-patterns so excluded files are correctly skipped. `parseBlock()` in `parser.ts` also emits a `warnings[]` entry when it detects an exclude-only Files list, so users know the decision will fire on every file except those excluded. Three trie regression tests and two parser warning tests added.
 
 ---
+
+### [BUG-010] line_range inverted range degrades to glob-only match
+- **Severity**: 🟡 Reliability
+- **Affects**: CLI, GitHub Action
+- **Status**: ✅ Fixed
+- **Branch**: `bugfix/BUG-010-line-range-inverted`
+- **Description**: When `start > end` in a `line_range` rule, `validateContentRule()` threw a 'Line range start must be <= end' error. This error was caught and stored as a warning, and the decision loaded with `rules: undefined`. Consequently, it fired as a glob-only pattern match on every file matching the pattern, producing false positives instead of cleanly failing.
+- **Root Cause**: In `rule-parser.ts`, inverted ranges prompted an error to be thrown instead of coercing or fixing the values.
+- **Resolution**: `validateContentRule()` now automatically swaps `start` and `end` if `start > end`, allowing the line range rule to function correctly rather than degrading to a false positive match.
+
+---
