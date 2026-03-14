@@ -5,3 +5,13 @@ coverage/
 workers/telemetry/.wrangler/
 workers/telemetry/.dev.vars
 .decispher/
+
+# Ignore tsc-compiled individual output files - only ncc bundles are committed
+dist/adapters/
+dist/core/
+dist/telemetry/
+dist/main.js
+dist/version.js
+dist/cli/commands/
+dist/cli/formatter.js
+dist/cli/paths.js

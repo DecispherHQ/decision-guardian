@@ -40667,6 +40667,10 @@ async function run() {
                 return;
             }
         }
+        if (config.failOnError && parseResult.warnings.length > 0) {
+            logger.setFailed(`Decision file has ${parseResult.warnings.length} rule parse warning(s) (fail-on-error enabled)`);
+            return;
+        }
         const hasRules = parseResult.decisions.some((d) => d.rules);
         logger.info(`Loaded ${parseResult.decisions.length} decisions (${hasRules ? 'with advanced rules' : 'file-based only'})`);
         logger.endGroup();
