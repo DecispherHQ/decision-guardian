@@ -658,5 +658,36 @@ This is a decision without rules.
             expect(rule.content_match_mode).toBe('any');
         });
     });
-});
+    
+    describe('BUG-010 Regression — line_range inverted range degrades to glob-only match', () => {
+        it('should swap start and end when start > end instead of throwing an error', async () => {
+            const content = `
+## DECISION-BUG010
+**Rules**: \`\`\`json
+{
+    "type": "file",
+    "pattern": "src/**/*.ts",
+    "content_rules": [
+        {
+            "mode": "line_range",
+            "start": 100,
+            "end": 1
+        }
+    ]
+}
+\`\`\`
+            `;
 
+            const result = await parser.extractRules(content, path.join(workspaceDir, 'decisions.md'));
+
+            expect(result.error).toBeUndefined();
+            expect(result.rules).toBeDefined();
+
+            // After coercion the content rule must have start <= end
+            const rule = result.rules as unknown as { content_rules: Array<{start: number, end: number}> };
+            const contentRule = rule.content_rules[0];
+            expect(contentRule.start).toBe(1);
+            expect(contentRule.end).toBe(100);
+        });
+    });
+});

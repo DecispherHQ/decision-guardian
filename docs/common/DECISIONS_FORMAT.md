@@ -662,7 +662,6 @@ Lines 1-10 contain license header. Changes require legal approval.
 | `Failed to parse JSON rules` | Invalid JSON | Validate with JSON linter |
 | `Rule nesting exceeds max depth` | >10 levels | Flatten structure |
 | `Invalid regex pattern` | Bad regex syntax | Test regex first |
-| `Line range start must be <= end` | start > end | Swap values |
 | `Unsafe regex pattern detected` | ReDoS risk | Simplify pattern |
 
 ### Validation Warnings
