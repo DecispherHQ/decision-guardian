@@ -104,3 +104,36 @@ Source files must contain license headers in the first 5 lines.
 
 ### Context
 Track usage of deprecated APIs and items marked for removal.
+
+---
+
+<!-- DECISION-ADV-004 -->
+## Decision: Authenticated Route Detection (AND content matching)
+**Status**: Active
+**Date**: 2024-07-15
+**Severity**: Warning
+**Files**:
+- `src/api/**/*.ts`
+
+**Rules**:
+```json
+{
+  "type": "file",
+  "pattern": "src/api/**/*.ts",
+  "content_match_mode": "all",
+  "content_rules": [
+    {
+      "mode": "string",
+      "patterns": ["router.post(", "router.put(", "router.delete("]
+    },
+    {
+      "mode": "regex",
+      "pattern": "authMiddleware"
+    }
+  ]
+}
+```
+
+### Context
+Fires only when a changed API file **both** defines a mutating route (POST/PUT/DELETE) **and** references `authMiddleware`.
+Set `content_match_mode: "all"` to enforce AND logic across `content_rules`. Omitting it (or using `"any"`) fires if **either** rule matches.

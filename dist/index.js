@@ -40155,7 +40155,7 @@ class RuleEvaluator {
             const allMatchedPatterns = [];
             const allMatchedFiles = [];
             for (const file of matchingFiles) {
-                const contentResult = await this.evaluateContentRules(rule.content_rules, file);
+                const contentResult = await this.evaluateContentRules(rule.content_rules, file, rule.content_match_mode);
                 if (contentResult.matched) {
                     allMatchedPatterns.push(...contentResult.matchedPatterns);
                     allMatchedFiles.push(file.filename);
@@ -40181,10 +40181,12 @@ class RuleEvaluator {
         }
     }
     /**
-     * Evaluate content rules against a file diff
+     * Evaluate content rules against a file diff.
+     * contentMatchMode 'all' requires every rule to match (AND); 'any' (default) requires at least one (OR).
      */
-    async evaluateContentRules(rules, file) {
+    async evaluateContentRules(rules, file, contentMatchMode = 'any') {
         const allMatchedPatterns = [];
+        let anyMatched = false;
         for (const rule of rules) {
             let result;
             switch (rule.mode) {
@@ -40209,11 +40211,16 @@ class RuleEvaluator {
                 }
             }
             if (result.matched) {
+                anyMatched = true;
                 allMatchedPatterns.push(...result.matchedPatterns);
+            }
+            else if (contentMatchMode === 'all') {
+                // Short-circuit: one unmatched rule breaks AND logic
+                return { matched: false, matchedPatterns: [] };
             }
         }
         return {
-            matched: allMatchedPatterns.length > 0,
+            matched: anyMatched,
             matchedPatterns: allMatchedPatterns.sort(),
         };
     }
@@ -40371,6 +40378,12 @@ class RuleParser {
     validateFileRule(rule) {
         if (!rule.pattern) {
             throw new Error('FileRule must have a pattern');
+        }
+        if (rule.content_match_mode && !['any', 'all'].includes(rule.content_match_mode)) {
+            throw new Error(`Invalid content_match_mode: "${rule.content_match_mode}". Must be "any" or "all"`);
+        }
+        if (!rule.content_match_mode) {
+            rule.content_match_mode = 'any';
         }
         if (rule.content_rules && Array.isArray(rule.content_rules)) {
             for (const contentRule of rule.content_rules) {

@@ -84,3 +84,38 @@ All public endpoints must include rate limiting. New endpoints require load test
 
 ### Context
 API responses should use validated schemas. Check that response DTOs are defined.
+
+---
+
+<!-- DECISION-API-004 -->
+## Decision: New Endpoints Must Export a Controller
+**Status**: Active
+**Date**: 2024-06-15
+**Severity**: Warning
+**Files**:
+- `src/api/**/*.ts`
+
+**Rules**:
+```json
+{
+  "type": "file",
+  "pattern": "src/api/**/*.ts",
+  "content_match_mode": "all",
+  "content_rules": [
+    {
+      "mode": "string",
+      "patterns": ["router.post(", "router.put(", "router.patch(", "router.delete("]
+    },
+    {
+      "mode": "regex",
+      "pattern": "export (default |const |function )"
+    }
+  ]
+}
+```
+
+### Context
+Fires only when a changed API file **both** defines a mutating route (POST/PUT/PATCH/DELETE) **and**
+exports a controller symbol — ensuring new endpoints are properly encapsulated and not defined inline.
+`content_match_mode: "all"` enforces AND logic: **every** `content_rules` entry must match the same
+file's diff before the decision triggers. Omit it (or use `"any"`) for OR logic (default).

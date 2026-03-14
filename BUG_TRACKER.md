@@ -50,3 +50,15 @@ This document tracks identified bugs, their severity, description, status, and t
 *(Add new bugs below!)*
 
 ---
+
+### [BUG-005] match_mode: "all" AND logic broken for content_rules within a FileRule
+- **Severity**: 🔴 Logic
+- **Affects**: CLI, GitHub Action
+- **Status**: ✅ Fixed
+- **Branch**: `fix/BUG-005-match-mode-all-and-logic`
+- **Description**: `evaluateContentRules()` in `rule-evaluator.ts` unconditionally applied OR logic — if **any** `content_rule` matched, the file rule fired. There was no mechanism to require that **all** `content_rules` match (AND) on a single `FileRule`. A decision like `{type:"file", pattern:"src/api/**/*.ts", content_rules:[{mode:"string",...},{mode:"regex",...}]}` would fire even when only one of the two content rules was satisfied, regardless of user intent.
+- **Root Cause**: `evaluateContentRules()` collected matched patterns across all rules and returned `matched: allMatchedPatterns.length > 0`. Any single match was enough. There was no `content_match_mode` field on `FileRule` to opt into AND behaviour.
+- **Resolution**: Added `content_match_mode?: "any" | "all"` to the `FileRule` interface. `evaluateSingleRule()` now passes it to `evaluateContentRules()`. When `"all"` is set, `evaluateContentRules()` short-circuits and returns `{matched: false}` as soon as any individual content rule fails to match — enforcing true AND semantics. Default remains `"any"` (OR), preserving backward compatibility. `validateFileRule()` in `rule-parser.ts` rejects invalid `content_match_mode` values with an actionable error. Seven regression tests added to `tests/core/rule-evaluator.test.ts` and four parser validation tests to `tests/core/rule-parser.test.ts`.
+
+---
+

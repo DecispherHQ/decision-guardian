@@ -539,4 +539,124 @@ This is a decision without rules.
             expect(result.error).toBeUndefined();
         });
     });
+
+    describe('BUG-005 Regression — content_match_mode validation', () => {
+        it('should accept content_match_mode: "any" on a FileRule', async () => {
+            const content = `
+## DECISION-BUG005-A
+**Rules**: \`\`\`json
+{
+    "type": "file",
+    "pattern": "src/**/*.ts",
+    "content_match_mode": "any",
+    "content_rules": [
+        { "mode": "string", "patterns": ["router.post("] },
+        { "mode": "regex", "pattern": "authMiddleware" }
+    ]
+}
+\`\`\`
+            `;
+
+            const result = await parser.extractRules(content, path.join(workspaceDir, 'decisions.md'));
+
+            expect(result.error).toBeUndefined();
+            expect(result.rules).toBeDefined();
+        });
+
+        it('should accept content_match_mode: "all" on a FileRule', async () => {
+            const content = `
+## DECISION-BUG005-B
+**Rules**: \`\`\`json
+{
+    "type": "file",
+    "pattern": "src/**/*.ts",
+    "content_match_mode": "all",
+    "content_rules": [
+        { "mode": "string", "patterns": ["router.post("] },
+        { "mode": "regex", "pattern": "authMiddleware" }
+    ]
+}
+\`\`\`
+            `;
+
+            const result = await parser.extractRules(content, path.join(workspaceDir, 'decisions.md'));
+
+            expect(result.error).toBeUndefined();
+            expect(result.rules).toBeDefined();
+        });
+
+        it('should reject an invalid content_match_mode value', async () => {
+            const content = `
+## DECISION-BUG005-C
+**Rules**: \`\`\`json
+{
+    "type": "file",
+    "pattern": "src/**/*.ts",
+    "content_match_mode": "invalid",
+    "content_rules": [
+        { "mode": "string", "patterns": ["foo"] }
+    ]
+}
+\`\`\`
+            `;
+
+            const result = await parser.extractRules(content, path.join(workspaceDir, 'decisions.md'));
+
+            expect(result.rules).toBeNull();
+            expect(result.error).toContain('Invalid content_match_mode');
+        });
+
+        it('should accept content_match_mode: "all" inside a conditions array', async () => {
+            const content = `
+## DECISION-BUG005-D
+**Rules**: \`\`\`json
+{
+    "match_mode": "all",
+    "conditions": [
+        {
+            "type": "file",
+            "pattern": "src/api/**/*.ts",
+            "content_match_mode": "all",
+            "content_rules": [
+                { "mode": "string", "patterns": ["router.post("] },
+                { "mode": "regex", "pattern": "authMiddleware" }
+            ]
+        }
+    ]
+}
+\`\`\`
+            `;
+
+            const result = await parser.extractRules(content, path.join(workspaceDir, 'decisions.md'));
+
+            expect(result.error).toBeUndefined();
+            expect(result.rules).toBeDefined();
+            expect(result.rules?.conditions).toHaveLength(1);
+        });
+
+        it('should default content_match_mode to "any" when missing', async () => {
+            const content = `
+## DECISION-BUG005-E
+**Rules**: \`\`\`json
+{
+    "type": "file",
+    "pattern": "src/**/*.ts",
+    "content_rules": [
+        { "mode": "string", "patterns": ["router.post("] }
+    ]
+}
+\`\`\`
+            `;
+
+            const result = await parser.extractRules(content, path.join(workspaceDir, 'decisions.md'));
+
+            expect(result.error).toBeUndefined();
+            expect(result.rules).toBeDefined();
+
+            // When no conditions structure is used, rules itself is the FileRule
+            const rule = result.rules as unknown as { content_match_mode: string };
+            expect(rule.content_match_mode).toBe('any');
+        });
+    });
 });
+

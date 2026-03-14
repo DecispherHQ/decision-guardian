@@ -126,6 +126,16 @@ export class RuleParser {
       throw new Error('FileRule must have a pattern');
     }
 
+    if (rule.content_match_mode && !['any', 'all'].includes(rule.content_match_mode)) {
+      throw new Error(
+        `Invalid content_match_mode: "${rule.content_match_mode}". Must be "any" or "all"`,
+      );
+    }
+
+    if (!rule.content_match_mode) {
+      rule.content_match_mode = 'any';
+    }
+
     if (rule.content_rules && Array.isArray(rule.content_rules)) {
       for (const contentRule of rule.content_rules) {
         this.validateContentRule(contentRule);
