@@ -145,8 +145,17 @@ export class RuleParser {
 
     switch (rule.mode) {
       case 'string': {
+        // BUG-002 fix: accept singular `pattern` string and coerce to `patterns` array.
         if (!rule.patterns || !Array.isArray(rule.patterns)) {
-          throw new Error('String mode requires patterns array');
+          if (typeof rule.pattern === 'string' && rule.pattern.length > 0) {
+            // Auto-coerce singular pattern → patterns array so the rule works correctly.
+            (rule as unknown as Record<string, unknown>).patterns = [rule.pattern];
+          } else {
+            throw new Error(
+              'String mode requires a "patterns" array (e.g. {"mode":"string","patterns":["foo"]}) ' +
+              'or a singular "pattern" string (e.g. {"mode":"string","pattern":"foo"})',
+            );
+          }
         }
         break;
       }
