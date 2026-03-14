@@ -32,7 +32,7 @@ This document tracks identified bugs, their severity, description, status, and t
 - **Branch**: `fix/BUG-003-json-path-nested-value-edit`
 - **Description**: `matchJsonPath()` scanned only added (`+`) diff lines when resolving dotted paths like `"database.password"`. For an in-place value edit (e.g. changing `"password": "old"` to `"password": "new"`), only the leaf `password` line appeared in the diff as an added line — the parent `"database": {` was an **unchanged context line** and therefore invisible to the matcher. The hierarchical scan failed to find the parent key, so `allKeysFound` became `false` and the path match silently returned no result. Any `json_path` rule with depth ≥ 2 was non-functional for value edits.
 - **Root Cause**: `getChangedLinesWithNumbers()` collected only `type === 'add'` lines. Context (normal) lines — which carry unchanged parent keys — were never included in the candidate set passed to `matchJsonPath()`.
-- **Resolution**: Added a new private helper `getChangedLinesWithContext()` that collects both `add` and `normal` (context) lines with their new-file line numbers, tagging each with an `isAdded` flag. `matchJsonPath()` now uses this richer set so ancestral keys found only in context lines are visible. To prevent false positives (matching a path that is purely contextual with no actual change), the **leaf key must still appear on an added line** (`leafIsAdded` guard). Four regression tests were added to `tests/core/content-matchers.test.ts` covering: 2-level in-place edit, 3-level deep in-place edit, false-positive guard (leaf only in context), and multiple-path partial match.
+- **Resolution**: Added a new private helper `getChangedLinesWithContext()` that collects both `add` and `normal` (context) lines with their new-file line numbers, tagging each with an `isAdded` flag. `matchJsonPath()` now uses this richer set so ancestral keys found only in context lines are visible. To prevent false positives (matching a path that is purely contextual with no actual change), the **leaf key must still appear on an added line** (`leafIsAdded` guard). Four regression tests were added to `tests/core/content-matchers.test.ts`.
 
 ---
 
@@ -41,13 +41,9 @@ This document tracks identified bugs, their severity, description, status, and t
 - **Affects**: CLI, GitHub Action
 - **Status**: ✅ Fixed
 - **Branch**: `fix/BUG-004-fail-on-error-ignores-warnings`
-- **Description**: Rule validation failures (malformed JSON, wrong schema, bad regex, inverted `line_range`) are caught in `rule-parser.ts` and stored in `parseResult.warnings[]` via `parser.ts` `parseBlock()`. The CLI's `--fail-on-error` flag (and GitHub Action's `fail_on_error` input) only checked `parseResult.errors[]`. Because rule parse failures land in `warnings[]` (a separate `string[]`), `--fail-on-error` exited 0 even when visibly broken rule schemas were present on screen (e.g. `⚠ DECISION-INV-001: Failed to parse inline JSON rules: Line range start must be <= end`).
+- **Description**: Rule validation failures (malformed JSON, wrong schema, bad regex, inverted `line_range`) are caught in `rule-parser.ts` and stored in `parseResult.warnings[]` via `parser.ts` `parseBlock()`. The CLI's `--fail-on-error` flag (and GitHub Action's `fail_on_error` input) only checked `parseResult.errors[]`. Because rule parse failures land in `warnings[]` (a separate `string[]`), `--fail-on-error` exited 0 even when visibly broken rule schemas were present on screen.
 - **Root Cause**: `parser.ts` `parseBlock()` pushes `ruleResult.error` into `warnings[]`, not `errors[]`. The `--fail-on-error` guard in `check.ts` and `main.ts` was never extended to cover this array.
-- **Resolution**: Added a second guard in `check.ts` and `main.ts` that exits/fails immediately after printing warnings if `failOnError` is enabled and `parseResult.warnings.length > 0`. Two regression tests added to `tests/cli/check.test.ts` covering: (1) exit 1 when rule parse warnings exist with `failOnError: true`, (2) exit 0 when warnings exist but `failOnError: false`.
-
----
-
-*(Add new bugs below!)*
+- **Resolution**: Added a second guard in `check.ts` and `main.ts` that exits/fails immediately after printing warnings if `failOnError` is enabled and `parseResult.warnings.length > 0`. Two regression tests added to `tests/cli/check.test.ts`.
 
 ---
 
@@ -62,3 +58,35 @@ This document tracks identified bugs, their severity, description, status, and t
 
 ---
 
+### [BUG-007] Deleted lines are invisible to all content matchers
+- **Severity**: 🟡 Behavioral (Undocumented)
+- **Affects**: CLI, GitHub Action
+- **Status**: ✅ Fixed
+- **Branch**: `fix/BUG-007-deleted-lines-invisible`
+- **Description**: All three diff-extraction methods — `getChangedLines()`, `getChangedLinesWithNumbers()`, and `extractChangedLineNumbers()` — filtered exclusively for `change.type === 'add'`. Removed lines (`del`) were silently ignored. As a result, removing a guarded element (e.g. deleting a hardcoded secret, removing an `authMiddleware` call) never triggered a decision. There was no way to author a decision that fires when a line is deleted.
+- **Root Cause**: `src/core/content-matchers.ts` — all three extraction methods only collected `type === 'add'` lines; `del` changes were never processed.
+- **Resolution**: Added `match_deleted_lines?: boolean` to the `ContentRule` interface (defaults to `false` for full backward compatibility). When set to `true`, `getChangedLines()` and `extractChangedLineNumbers()` include `del` diff lines alongside `add` lines. `matchString()`, `matchRegex()`, and `matchLineRange()` each pass `rule.match_deleted_lines ?? false` into the helpers. Four regression tests added to `tests/core/content-matchers.test.ts`.
+
+---
+
+### [BUG-008] Duplicate decision IDs: both fire, no warning
+- **Severity**: 🟡 Reliability
+- **Affects**: CLI, GitHub Action
+- **Status**: ✅ Fixed
+- **Branch**: `fix/BUG-008-duplicate-decision-ids`
+- **Description**: Two decisions with the same ID in the same file (or across files in `checkall`) were both loaded and both fired independently. The parser had no deduplication step. In a multi-file directory scan, the same ID could appear with different severities — both matched, producing confusing output. No warning was emitted to the user.
+- **Root Cause**: `src/core/parser.ts` — `parseContent()` pushed every parsed block to `decisions[]` with no ID uniqueness check.
+- **Resolution**: After all blocks are parsed, a deduplication pass in `parseContent()` keeps only the first occurrence per ID. Subsequent duplicates are discarded and a descriptive warning (including line number and source file) is pushed to `parseResult.warnings[]`. Four regression tests added to `tests/core/parser.test.ts`.
+
+---
+
+### [BUG-009] Exclude-only Files patterns are silently no-ops
+- **Severity**: 🟡 Usability
+- **Affects**: CLI, GitHub Action
+- **Status**: ✅ Fixed
+- **Branch**: `fix/BUG-009-exclude-only-files-noop`
+- **Description**: The `PatternTrie` constructor skipped all patterns starting with `!`. A decision whose `Files` list contained only exclusion patterns (e.g. `!src/**/*.test.ts`) was never inserted into the trie, never received candidates from `findCandidates()`, and never fired. No warning was emitted. The decision was silently ignored.
+- **Root Cause**: `src/core/trie.ts` — the constructor iterated `decision.files` and skipped every `!`-prefixed pattern, so a decision with exclusion-only files produced no trie insertion at all.
+- **Resolution**: When all patterns for a decision are exclusions, the trie constructor now inserts it under `**` (match-all), ensuring `findCandidates()` returns it as a candidate for every file. The existing exclusion gate in `matchesDecision()` (`matcher.ts`) then applies the `!`-patterns so excluded files are correctly skipped. `parseBlock()` in `parser.ts` also emits a `warnings[]` entry when it detects an exclude-only Files list, so users know the decision will fire on every file except those excluded. Three trie regression tests and two parser warning tests added.
+
+---

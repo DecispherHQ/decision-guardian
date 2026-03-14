@@ -38976,7 +38976,7 @@ class ContentMatchers {
      * Match string patterns in changed lines
      */
     matchString(rule, fileDiff) {
-        const changedLines = this.getChangedLines(fileDiff.patch);
+        const changedLines = this.getChangedLines(fileDiff.patch, rule.match_deleted_lines ?? false);
         const matchedPatterns = [];
         for (const pattern of rule.patterns || []) {
             if (changedLines.some((line) => line.includes(pattern))) {
@@ -39005,7 +39005,7 @@ class ContentMatchers {
             });
             return { matched: false, matchedPatterns: [] };
         }
-        const changedContent = this.getChangedLines(fileDiff.patch).join('\n');
+        const changedContent = this.getChangedLines(fileDiff.patch, rule.match_deleted_lines ?? false).join('\n');
         const MAX_CONTENT_SIZE = 1024 * 1024;
         if (changedContent.length > MAX_CONTENT_SIZE) {
             (0, logger_1.logStructured)(this.logger, 'warning', `[Security] Content exceeds size limit`, {
@@ -39084,7 +39084,7 @@ class ContentMatchers {
      * Match if changes occur within specified line range
      */
     matchLineRange(rule, fileDiff) {
-        const changedLineNumbers = this.extractChangedLineNumbers(fileDiff.patch);
+        const changedLineNumbers = this.extractChangedLineNumbers(fileDiff.patch, rule.match_deleted_lines ?? false);
         const matched = changedLineNumbers.some((lineNum) => lineNum >= rule.start && lineNum <= rule.end);
         return {
             matched,
@@ -39160,7 +39160,7 @@ class ContentMatchers {
     /**
      * Extract changed (added) lines from diff using parse-diff
      */
-    getChangedLines(patch) {
+    getChangedLines(patch, includeDeleted = false) {
         if (!patch)
             return [];
         try {
@@ -39174,6 +39174,9 @@ ${patch}`;
                 for (const chunk of file.chunks) {
                     for (const change of chunk.changes) {
                         if (change.type === 'add') {
+                            lines.push(change.content.substring(1));
+                        }
+                        else if (includeDeleted && change.type === 'del') {
                             lines.push(change.content.substring(1));
                         }
                     }
@@ -39191,7 +39194,7 @@ ${patch}`;
     /**
      * Extract line numbers of changed lines using parse-diff
      */
-    extractChangedLineNumbers(patch) {
+    extractChangedLineNumbers(patch, includeDeleted = false) {
         if (!patch)
             return [];
         try {
@@ -39206,6 +39209,9 @@ ${patch}`;
                     for (const change of chunk.changes) {
                         if (change.type === 'add' && change.ln) {
                             lineNumbers.push(change.ln);
+                        }
+                        else if (includeDeleted && change.type === 'del' && change.ln1) {
+                            lineNumbers.push(change.ln1);
                         }
                     }
                 }
@@ -39872,7 +39878,22 @@ class DecisionParser {
                 });
             }
         }
-        return { decisions, errors, warnings };
+        // Deduplicate by ID — keep first occurrence, warn on subsequent duplicates
+        const seenIds = new Map(); // id -> line number of first occurrence
+        const deduped = [];
+        for (const decision of decisions) {
+            const firstLine = seenIds.get(decision.id);
+            if (firstLine !== undefined) {
+                warnings.push(`Duplicate decision ID "${decision.id}" at line ${decision.lineNumber} ` +
+                    `(first seen at line ${firstLine} in ${sourceFile}). ` +
+                    `Only the first occurrence will be evaluated; the duplicate is ignored.`);
+            }
+            else {
+                seenIds.set(decision.id, decision.lineNumber);
+                deduped.push(decision);
+            }
+        }
+        return { decisions: deduped, errors, warnings };
     }
     /**
      * Split content into decision blocks
