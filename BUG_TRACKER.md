@@ -37,3 +37,14 @@ This document tracks identified bugs, their severity, description, status, and t
 ---
 
 *(Add new bugs below!)*
+
+---
+
+### [BUG-004] --fail-on-error does not exit 1 on rule parse failures
+- **Severity**: 🔴 Reliability
+- **Affects**: CLI, GitHub Action
+- **Status**: ✅ Fixed
+- **Branch**: `fix/BUG-004-fail-on-error-ignores-warnings`
+- **Description**: Rule validation failures (malformed JSON, wrong schema, bad regex, inverted `line_range`) are caught in `rule-parser.ts` and stored in `parseResult.warnings[]` via `parser.ts` `parseBlock()`. The CLI's `--fail-on-error` flag (and GitHub Action's `fail_on_error` input) only checked `parseResult.errors[]`. Because rule parse failures land in `warnings[]` (a separate `string[]`), `--fail-on-error` exited 0 even when visibly broken rule schemas were present on screen (e.g. `⚠ DECISION-INV-001: Failed to parse inline JSON rules: Line range start must be <= end`).
+- **Root Cause**: `parser.ts` `parseBlock()` pushes `ruleResult.error` into `warnings[]`, not `errors[]`. The `--fail-on-error` guard in `check.ts` and `main.ts` was never extended to cover this array.
+- **Resolution**: Added a second guard in `check.ts` and `main.ts` that exits/fails immediately after printing warnings if `failOnError` is enabled and `parseResult.warnings.length > 0`. Two regression tests added to `tests/cli/check.test.ts` covering: (1) exit 1 when rule parse warnings exist with `failOnError: true`, (2) exit 0 when warnings exist but `failOnError: false`.
