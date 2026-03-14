@@ -25,21 +25,37 @@ Never modify existing migration files. Create new migrations instead. Modifying 
 **Rules**:
 ```json
 {
-  "match": "any",
+  "match_mode": "any",
   "conditions": [
     {
-      "files": ["prisma/schema.prisma"],
-      "content": {
-        "mode": "regex",
-        "pattern": "@@map|@@ignore|model\\s+\\w+"
-      }
+      "type": "file",
+      "pattern": "prisma/schema.prisma",
+      "content_rules": [
+        {
+          "mode": "regex",
+          "pattern": "@@map|@@ignore|model\\s+\\w+"
+        }
+      ]
     },
     {
-      "files": ["src/db/schema.ts", "drizzle/**/*.ts"],
-      "content": {
-        "mode": "string",
-        "patterns": ["createTable", "dropTable", "alterTable", "addColumn", "dropColumn"]
-      }
+      "type": "file",
+      "pattern": "src/db/schema.ts",
+      "content_rules": [
+        {
+          "mode": "string",
+          "patterns": ["createTable", "dropTable", "alterTable", "addColumn", "dropColumn"]
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "pattern": "drizzle/**/*.ts",
+      "content_rules": [
+        {
+          "mode": "string",
+          "patterns": ["createTable", "dropTable", "alterTable", "addColumn", "dropColumn"]
+        }
+      ]
     }
   ]
 }
@@ -63,15 +79,29 @@ Schema changes must be paired with migrations and reviewed by the database team.
 **Rules**:
 ```json
 {
-  "match": "any",
+  "match_mode": "any",
   "conditions": [
     {
-      "files": ["config/database.*", "src/db/pool.*"],
-      "content": {
-        "mode": "regex",
-        "pattern": "(pool_size|max_connections|min_connections|idle_timeout)\\s*[:=]",
-        "flags": "i"
-      }
+      "type": "file",
+      "pattern": "config/database.*",
+      "content_rules": [
+        {
+          "mode": "regex",
+          "pattern": "(pool_size|max_connections|min_connections|idle_timeout)\\s*[:=]",
+          "flags": "i"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "pattern": "src/db/pool.*",
+      "content_rules": [
+        {
+          "mode": "regex",
+          "pattern": "(pool_size|max_connections|min_connections|idle_timeout)\\s*[:=]",
+          "flags": "i"
+        }
+      ]
     }
   ]
 }

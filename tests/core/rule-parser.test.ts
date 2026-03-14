@@ -321,6 +321,105 @@ describe('RuleParser', () => {
         });
     });
 
+    describe('BUG-001 Regression — Template Schema (type/pattern/content_rules)', () => {
+        it('should parse a FileRule condition with type:"file", pattern, and content_rules', async () => {
+            const content = `
+## DECISION-SEC-001
+**Rules**: \`\`\`json
+{
+    "match_mode": "any",
+    "conditions": [
+        {
+            "type": "file",
+            "pattern": "src/**/*.ts",
+            "content_rules": [
+                {
+                    "mode": "regex",
+                    "pattern": "(api[_-]?key|secret)\\\\s*[:=]\\\\s*['\\\"][^'\\\"]{8,}['\\\"]",
+                    "flags": "i"
+                }
+            ]
+        }
+    ]
+}
+\`\`\`
+            `;
+
+            const result = await parser.extractRules(content, path.join(workspaceDir, 'decisions.md'));
+
+            expect(result.error).toBeUndefined();
+            expect(result.rules).toBeDefined();
+            expect(result.rules?.conditions).toHaveLength(1);
+
+            const condition = result.rules?.conditions?.[0] as { type: string; pattern: string };
+            expect(condition.type).toBe('file');
+            expect(condition.pattern).toBe('src/**/*.ts');
+        });
+
+        it('should parse multiple FileRule conditions (one per file glob)', async () => {
+            const content = `
+## DECISION-SEC-002
+**Rules**: \`\`\`json
+{
+    "match_mode": "any",
+    "conditions": [
+        {
+            "type": "file",
+            "pattern": "src/**/*.ts",
+            "content_rules": [{ "mode": "string", "patterns": ["router.get("] }]
+        },
+        {
+            "type": "file",
+            "pattern": "src/**/*.js",
+            "content_rules": [{ "mode": "string", "patterns": ["router.get("] }]
+        }
+    ]
+}
+\`\`\`
+            `;
+
+            const result = await parser.extractRules(content, path.join(workspaceDir, 'decisions.md'));
+
+            expect(result.error).toBeUndefined();
+            expect(result.rules).toBeDefined();
+            expect(result.rules?.conditions).toHaveLength(2);
+        });
+
+        it('should reject the old wrong template schema: {files:[...], content:{...}} without type or pattern', async () => {
+            // The old (buggy) template format — conditions have no `type` and no `pattern` (string),
+            // so isFileRule() returns false and they fall through as empty RuleConditions.
+            // This test documents that the parser does NOT treat them as valid FileRules.
+            const content = `
+## DECISION-WRONG
+**Rules**: \`\`\`json
+{
+    "match": "any",
+    "conditions": [
+        {
+            "files": ["src/**/*.ts"],
+            "content": {
+                "mode": "regex",
+                "pattern": "api_key",
+                "flags": "i"
+            }
+        }
+    ]
+}
+\`\`\`
+            `;
+
+            const result = await parser.extractRules(content, path.join(workspaceDir, 'decisions.md'));
+
+            // The old schema parses as JSON without throwing, but none of the conditions
+            // have `type === "file"` and a `pattern` string — so they will not be
+            // dispatched to evaluateSingleRule(), producing zero matches at runtime.
+            // Confirm conditions are NOT recognised as FileRules (no `type` field).
+            const condition = result.rules?.conditions?.[0] as Record<string, unknown> | undefined;
+            // Either parsing fails or the condition lacks `type:"file"` — either way it must NOT have type === "file"
+            expect(condition?.type).not.toBe('file');
+        });
+    });
+
     describe('No Rules', () => {
         it('should return null when no rules found', async () => {
             const content = `
