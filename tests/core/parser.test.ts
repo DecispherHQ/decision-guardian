@@ -229,5 +229,31 @@ some random text
             expect(extWarnings).toHaveLength(0);
         });
     });
+
+    // ── BUG-012 Regression — empty and whitespace-only decision files ──────────
+
+    describe('BUG-012 Regression — empty and whitespace-only decision files', () => {
+        it('should emit a warning for completely empty files', async () => {
+            const result = await parser.parseContent('', 'empty.md');
+            expect(result.decisions).toHaveLength(0);
+            expect(result.warnings).toHaveLength(1);
+            expect(result.warnings[0]).toMatch(/empty or contains no decisions/i);
+        });
+
+        it('should emit a warning for whitespace-only files', async () => {
+            const result = await parser.parseContent('   \n\t  ', 'whitespace.md');
+            expect(result.decisions).toHaveLength(0);
+            expect(result.warnings).toHaveLength(1);
+            expect(result.warnings[0]).toMatch(/empty or contains no decisions/i);
+        });
+
+        it('should emit a warning for files with content but no decision markers', async () => {
+            const content = '# Title\nSome content without markers.';
+            const result = await parser.parseContent(content, 'nomarkers.md');
+            expect(result.decisions).toHaveLength(0);
+            expect(result.warnings).toHaveLength(1);
+            expect(result.warnings[0]).toMatch(/empty or contains no decisions/i);
+        });
+    });
 });
 

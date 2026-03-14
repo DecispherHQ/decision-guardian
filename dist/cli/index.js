@@ -9562,6 +9562,9 @@ class DecisionParser {
         const errors = [];
         const warnings = [];
         const blocks = this.splitIntoBlocks(content);
+        if (blocks.length === 0) {
+            warnings.push(`Decision file is empty or contains no decisions: ${path.basename(sourceFile)}`);
+        }
         for (const block of blocks) {
             try {
                 const decision = await this.parseBlock(block, sourceFile, warnings);

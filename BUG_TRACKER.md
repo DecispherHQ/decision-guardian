@@ -110,3 +110,14 @@ This document tracks identified bugs, their severity, description, status, and t
 - **Resolution**: `parseBlock()` now throws an error when `ruleResult.error` is present. This correctly skips adding the decision and routes the error message to the `errors` array, preventing false-positive matches and ensuring `--fail-on-error` can catch it. Added one regression test to `tests/core/parser.test.ts`.
 
 ---
+
+### [BUG-012] Empty and whitespace-only decision files silently ignored
+- **Severity**: 🟡 Usability
+- **Affects**: CLI, GitHub Action, Documentation
+- **Status**: ✅ Fixed
+- **Branch**: `fix/BUG-012-empty-decision-files`
+- **Description**: Empty `.md` files and files containing only whitespace were successfully passed to `parseContent()`, which called `splitIntoBlocks()`. The `content.trim()` check inside `splitIntoBlocks()` returned early with an empty `[]` array. The file then produced `{decisions: [], errors: [], warnings: []}`. In `checkall` directory mode, these empty results were merged silently with zero output, providing no feedback to the user that a file was empty or missing decision markers.
+- **Root Cause**: `parseContent()` in `src/core/parser.ts` did not check if any blocks were returned by `splitIntoBlocks()` and gave no warning if the file was empty or lacked decision markers.
+- **Resolution**: Updated `parseContent()` to emit a warning to `parseResult.warnings[]` when no decision blocks are found in a file. This ensures that in both direct file mode and `checkall` directory mode, the user is notified of empty or invalid decision files. Added three regression tests to `tests/core/parser.test.ts`.
+
+---
