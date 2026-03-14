@@ -153,7 +153,7 @@ export class RuleParser {
           } else {
             throw new Error(
               'String mode requires a "patterns" array (e.g. {"mode":"string","patterns":["foo"]}) ' +
-              'or a singular "pattern" string (e.g. {"mode":"string","pattern":"foo"})',
+                'or a singular "pattern" string (e.g. {"mode":"string","pattern":"foo"})',
             );
           }
         }
