@@ -384,7 +384,6 @@ describe('RuleParser', () => {
             expect(result.rules).toBeDefined();
             expect(result.rules?.conditions).toHaveLength(2);
         });
-
         it('should reject the old wrong template schema: {files:[...], content:{...}} without type or pattern', async () => {
             // The old (buggy) template format — conditions have no `type` and no `pattern` (string),
             // so isFileRule() returns false and they fall through as empty RuleConditions.
@@ -417,6 +416,113 @@ describe('RuleParser', () => {
             const condition = result.rules?.conditions?.[0] as Record<string, unknown> | undefined;
             // Either parsing fails or the condition lacks `type:"file"` — either way it must NOT have type === "file"
             expect(condition?.type).not.toBe('file');
+        });
+    });
+
+    describe('BUG-002 Regression — string mode singular pattern coercion', () => {
+        it('should accept singular "pattern" string in string mode and coerce to patterns array', async () => {
+            const content = `
+## DECISION-BUG002
+**Rules**: \`\`\`json
+{
+    "type": "file",
+    "pattern": "src/**/*.ts",
+    "content_rules": [
+        {
+            "mode": "string",
+            "pattern": "router.post("
+        }
+    ]
+}
+\`\`\`
+            `;
+
+            const result = await parser.extractRules(content, path.join(workspaceDir, 'decisions.md'));
+
+            // Must NOT fail — coercion must have happened silently
+            expect(result.error).toBeUndefined();
+            expect(result.rules).toBeDefined();
+        });
+
+        it('should coerce singular pattern and expose it as patterns array on the content rule object', async () => {
+            const content = `
+## DECISION-BUG002-B
+**Rules**: \`\`\`json
+{
+    "match_mode": "any",
+    "conditions": [
+        {
+            "type": "file",
+            "pattern": "src/**/*.ts",
+            "content_rules": [
+                {
+                    "mode": "string",
+                    "pattern": "router.post("
+                }
+            ]
+        }
+    ]
+}
+\`\`\`
+            `;
+
+            const result = await parser.extractRules(content, path.join(workspaceDir, 'decisions.md'));
+
+            expect(result.error).toBeUndefined();
+            expect(result.rules).toBeDefined();
+
+            // After coercion the content rule must expose a `patterns` array
+            const condition = result.rules?.conditions?.[0] as { content_rules?: Array<Record<string, unknown>> };
+            const contentRule = condition?.content_rules?.[0];
+            expect(Array.isArray(contentRule?.['patterns'])).toBe(true);
+            expect(contentRule?.['patterns']).toEqual(['router.post(']);
+        });
+
+        it('should leave existing patterns array untouched when patterns is already an array', async () => {
+            const content = `
+## DECISION-BUG002-C
+**Rules**: \`\`\`json
+{
+    "type": "file",
+    "pattern": "src/**/*.ts",
+    "content_rules": [
+        {
+            "mode": "string",
+            "patterns": ["router.post(", "router.put("]
+        }
+    ]
+}
+\`\`\`
+            `;
+
+            const result = await parser.extractRules(content, path.join(workspaceDir, 'decisions.md'));
+
+            expect(result.error).toBeUndefined();
+            expect(result.rules).toBeDefined();
+        });
+
+        it('should throw (and return error) for string mode with neither pattern nor patterns', async () => {
+            const content = `
+## DECISION-BUG002-D
+**Rules**: \`\`\`json
+{
+    "type": "file",
+    "pattern": "src/**/*.ts",
+    "content_rules": [
+        {
+            "mode": "string"
+        }
+    ]
+}
+\`\`\`
+            `;
+
+            const result = await parser.extractRules(content, path.join(workspaceDir, 'decisions.md'));
+
+            // Neither pattern nor patterns provided — should still be an error
+            expect(result.rules).toBeNull();
+            expect(result.error).toBeDefined();
+            expect(result.error).toContain('String mode requires');
         });
     });
 
