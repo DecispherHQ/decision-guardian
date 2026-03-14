@@ -40,6 +40,9 @@ export interface ContentRule {
 
   /** Only match in changed lines, not context (default: true) */
   match_changed_lines_only?: boolean;
+
+  /** Also match deleted lines (type 'del') in addition to added lines (default: false) */
+  match_deleted_lines?: boolean;
 }
 
 /**

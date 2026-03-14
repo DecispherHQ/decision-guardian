@@ -281,6 +281,122 @@ context line
             expect(result.matchedPatterns).toHaveLength(0);
         });
 
+        // ── BUG-007 regression tests ──────────────────────────────────────────────
+
+        it('[BUG-007] matchString: deleted lines are invisible by default (backward compat)', () => {
+            (parseDiff as unknown as jest.Mock).mockReturnValue([
+                {
+                    chunks: [
+                        {
+                            changes: [
+                                { type: 'del', content: '-const api_key = "sk_live_supersecret123";' },
+                                { type: 'add', content: '+const api_key = process.env.API_KEY;' },
+                            ],
+                        },
+                    ],
+                },
+            ]);
+
+            const fileDiff: FileDiff = {
+                filename: 'src/old-secrets.ts',
+                patch: 'mocked',
+                additions: 1,
+                deletions: 1,
+                changes: 2,
+                status: 'modified',
+            };
+
+            // Without match_deleted_lines — hardcoded secret on the deleted line must NOT match
+            const rule = { mode: 'string', patterns: ['sk_live_supersecret123'] };
+            const result = matchers.matchString(rule as any, fileDiff);
+            expect(result.matched).toBe(false);
+        });
+
+        it('[BUG-007] matchString: deleted lines ARE visible with match_deleted_lines: true', () => {
+            (parseDiff as unknown as jest.Mock).mockReturnValue([
+                {
+                    chunks: [
+                        {
+                            changes: [
+                                { type: 'del', content: '-const api_key = "sk_live_supersecret123";' },
+                                { type: 'add', content: '+const api_key = process.env.API_KEY;' },
+                            ],
+                        },
+                    ],
+                },
+            ]);
+
+            const fileDiff: FileDiff = {
+                filename: 'src/old-secrets.ts',
+                patch: 'mocked',
+                additions: 1,
+                deletions: 1,
+                changes: 2,
+                status: 'modified',
+            };
+
+            const rule = { mode: 'string', patterns: ['sk_live_supersecret123'], match_deleted_lines: true };
+            const result = matchers.matchString(rule as any, fileDiff);
+            expect(result.matched).toBe(true);
+            expect(result.matchedPatterns).toContain('sk_live_supersecret123');
+        });
+
+        it('[BUG-007] matchRegex: deleted lines ARE visible with match_deleted_lines: true', async () => {
+            (parseDiff as unknown as jest.Mock).mockReturnValue([
+                {
+                    chunks: [
+                        {
+                            changes: [
+                                { type: 'del', content: '-const api_key = "sk_live_supersecret123";' },
+                                { type: 'add', content: '+const api_key = process.env.API_KEY;' },
+                            ],
+                        },
+                    ],
+                },
+            ]);
+
+            const fileDiff: FileDiff = {
+                filename: 'src/old-secrets.ts',
+                patch: 'mocked',
+                additions: 1,
+                deletions: 1,
+                changes: 2,
+                status: 'modified',
+            };
+
+            const rule = { mode: 'regex', pattern: 'sk_live_[a-z0-9]+', match_deleted_lines: true };
+            const result = await matchers.matchRegex(rule as any, fileDiff);
+            expect(result.matched).toBe(true);
+        });
+
+        it('[BUG-007] matchRegex: deleted lines NOT matched by default (backward compat)', async () => {
+            (parseDiff as unknown as jest.Mock).mockReturnValue([
+                {
+                    chunks: [
+                        {
+                            changes: [
+                                { type: 'del', content: '-const api_key = "sk_live_supersecret123";' },
+                                { type: 'add', content: '+const api_key = process.env.API_KEY;' },
+                            ],
+                        },
+                    ],
+                },
+            ]);
+
+            const fileDiff: FileDiff = {
+                filename: 'src/old-secrets.ts',
+                patch: 'mocked',
+                additions: 1,
+                deletions: 1,
+                changes: 2,
+                status: 'modified',
+            };
+
+            const rule = { mode: 'regex', pattern: 'sk_live_[a-z0-9]+' };
+            const result = await matchers.matchRegex(rule as any, fileDiff);
+            expect(result.matched).toBe(false);
+        });
+
         it('[BUG-003] should correctly handle multiple paths — match one but not the other', () => {
             // "database.password" value was edited (leaf is an add line).
             // "api.key" appears only as a context line — must NOT match.

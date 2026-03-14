@@ -34,7 +34,7 @@ export class ContentMatchers {
     rule: ContentRule,
     fileDiff: FileDiff,
   ): { matched: boolean; matchedPatterns: string[] } {
-    const changedLines = this.getChangedLines(fileDiff.patch);
+    const changedLines = this.getChangedLines(fileDiff.patch, rule.match_deleted_lines ?? false);
     const matchedPatterns: string[] = [];
 
     for (const pattern of rule.patterns || []) {
@@ -71,7 +71,7 @@ export class ContentMatchers {
       return { matched: false, matchedPatterns: [] };
     }
 
-    const changedContent = this.getChangedLines(fileDiff.patch).join('\n');
+    const changedContent = this.getChangedLines(fileDiff.patch, rule.match_deleted_lines ?? false).join('\n');
     const MAX_CONTENT_SIZE = 1024 * 1024;
 
     if (changedContent.length > MAX_CONTENT_SIZE) {
@@ -169,7 +169,7 @@ export class ContentMatchers {
     rule: ContentRule,
     fileDiff: FileDiff,
   ): { matched: boolean; matchedPatterns: string[] } {
-    const changedLineNumbers = this.extractChangedLineNumbers(fileDiff.patch);
+    const changedLineNumbers = this.extractChangedLineNumbers(fileDiff.patch, rule.match_deleted_lines ?? false);
 
     const matched = changedLineNumbers.some(
       (lineNum) => lineNum >= rule.start! && lineNum <= rule.end!,
@@ -264,7 +264,7 @@ export class ContentMatchers {
   /**
    * Extract changed (added) lines from diff using parse-diff
    */
-  private getChangedLines(patch: string): string[] {
+  private getChangedLines(patch: string, includeDeleted = false): string[] {
     if (!patch) return [];
 
     try {
@@ -280,6 +280,8 @@ ${patch}`;
         for (const chunk of file.chunks) {
           for (const change of chunk.changes as ParsedChange[]) {
             if (change.type === 'add') {
+              lines.push(change.content.substring(1));
+            } else if (includeDeleted && change.type === 'del') {
               lines.push(change.content.substring(1));
             }
           }
@@ -298,7 +300,7 @@ ${patch}`;
   /**
    * Extract line numbers of changed lines using parse-diff
    */
-  private extractChangedLineNumbers(patch: string): number[] {
+  private extractChangedLineNumbers(patch: string, includeDeleted = false): number[] {
     if (!patch) return [];
 
     try {
@@ -315,6 +317,8 @@ ${patch}`;
           for (const change of chunk.changes as ParsedChange[]) {
             if (change.type === 'add' && change.ln) {
               lineNumbers.push(change.ln);
+            } else if (includeDeleted && change.type === 'del' && change.ln1) {
+              lineNumbers.push(change.ln1);
             }
           }
         }
