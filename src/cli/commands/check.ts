@@ -56,6 +56,13 @@ export async function runCheck(opts: CheckOptions): Promise<void> {
       }
     }
 
+    if (opts.failOnError && parseResult.warnings.length > 0) {
+      logger.error(
+        `Check failed: ${parseResult.warnings.length} rule parse warning(s) found (fail-on-error enabled)`,
+      );
+      process.exit(1);
+    }
+
     if (parseResult.decisions.length === 0) {
       logger.warning('No decisions found in the specified path.');
       process.exit(0);
