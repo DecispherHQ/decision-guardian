@@ -40,6 +40,9 @@ export interface ContentRule {
 
   /** Only match in changed lines, not context (default: true) */
   match_changed_lines_only?: boolean;
+
+  /** Also match deleted lines (type 'del') in addition to added lines (default: false) */
+  match_deleted_lines?: boolean;
 }
 
 /**
@@ -57,6 +60,9 @@ export interface FileRule {
 
   /** Content rules to apply to matched files */
   content_rules?: ContentRule[];
+
+  /** How to combine content_rules: 'any' (OR, default) or 'all' (AND) */
+  content_match_mode?: MatchMode;
 }
 
 /**

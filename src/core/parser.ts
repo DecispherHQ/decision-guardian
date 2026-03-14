@@ -142,6 +142,10 @@ export class DecisionParser {
 
     const blocks = this.splitIntoBlocks(content);
 
+    if (blocks.length === 0) {
+      warnings.push(`Decision file is empty or contains no decisions: ${path.basename(sourceFile)}`);
+    }
+
     for (const block of blocks) {
       try {
         const decision = await this.parseBlock(block, sourceFile, warnings);
@@ -166,7 +170,24 @@ export class DecisionParser {
       }
     }
 
-    return { decisions, errors, warnings };
+    // Deduplicate by ID — keep first occurrence, warn on subsequent duplicates
+    const seenIds = new Map<string, number>(); // id -> line number of first occurrence
+    const deduped: Decision[] = [];
+    for (const decision of decisions) {
+      const firstLine = seenIds.get(decision.id);
+      if (firstLine !== undefined) {
+        warnings.push(
+          `Duplicate decision ID "${decision.id}" at line ${decision.lineNumber} ` +
+            `(first seen at line ${firstLine} in ${sourceFile}). ` +
+            `Only the first occurrence will be evaluated; the duplicate is ignored.`,
+        );
+      } else {
+        seenIds.set(decision.id, decision.lineNumber);
+        deduped.push(decision);
+      }
+    }
+
+    return { decisions: deduped, errors, warnings };
   }
 
   /**
@@ -234,9 +255,20 @@ export class DecisionParser {
 
     const files = this.extractFilesList(content);
 
+    // Warn when every Files pattern is an exclusion — the decision would match
+    // no files at all without at least one include pattern.
+    if (files.length > 0 && files.every((f) => f.startsWith('!'))) {
+      warnings.push(
+        `${id}: All "Files" patterns are exclusions (start with "!"). ` +
+          `The decision will match every file except those excluded. ` +
+          `Add at least one include pattern (e.g. "**") if that is intentional.`,
+      );
+    }
+
     const ruleResult = await this.ruleParser.extractRules(content, sourceFile);
+
     if (ruleResult.error) {
-      warnings.push(`${id}: ${ruleResult.error}`);
+      throw new Error(`${id}: ${ruleResult.error}`);
     }
 
     const contextMatch = content.match(/###\s*Context\s*\n([\s\S]+?)(?=\n---+|\n<!--|$)/);

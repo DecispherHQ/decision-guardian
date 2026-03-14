@@ -115,4 +115,48 @@ describe('check command', () => {
 
         expect(mockExit).toHaveBeenCalledWith(1);
     });
+
+    // BUG-004 regression: rule parse failures end up in warnings[], not errors[].
+    // --fail-on-error must exit 1 when warnings are present.
+    it('should exit 1 when rule parse warnings exist and failOnError is true', async () => {
+        (DecisionParser as jest.Mock).mockImplementation(() => ({
+            parseFile: jest.fn().mockResolvedValue({
+                decisions: [{ id: 'DEC-INV' }],
+                warnings: ['DECISION-INV-001: Failed to parse inline JSON rules: Line range start must be <= end'],
+                errors: []
+            })
+        }));
+
+        (LocalGitProvider as jest.Mock).mockImplementation(() => ({
+            getFileDiffs: jest.fn().mockResolvedValue([])
+        }));
+
+        await runCheck({
+            decisionFile: 'decisions.md',
+            mode: 'staged',
+            failOnCritical: false,
+            failOnError: true
+        });
+
+        expect(mockExit).toHaveBeenCalledWith(1);
+    });
+
+    it('should exit 0 when rule parse warnings exist but failOnError is false', async () => {
+        (DecisionParser as jest.Mock).mockImplementation(() => ({
+            parseFile: jest.fn().mockResolvedValue({
+                decisions: [],
+                warnings: ['DECISION-INV-001: Failed to parse inline JSON rules: Line range start must be <= end'],
+                errors: []
+            })
+        }));
+
+        await runCheck({
+            decisionFile: 'decisions.md',
+            mode: 'staged',
+            failOnCritical: false,
+            failOnError: false
+        });
+
+        expect(mockExit).toHaveBeenCalledWith(0);
+    });
 });

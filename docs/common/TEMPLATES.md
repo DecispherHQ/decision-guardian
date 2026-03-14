@@ -19,13 +19,13 @@ Covers: file paths, glob wildcards, severity levels, status tracking.
 
 JSON-based rules with regex, content matching, boolean logic, and line ranges.
 
-Covers: `content_rules`, `match_mode` (any/all), `regex` with flags, `line_range`, `json_path`.
+Covers: `content_rules`, `match_mode` (any/all across conditions), `content_match_mode` (any/all across content rules), `regex` with flags, `line_range`, `json_path`.
 
 ### `security`
 
-Security-focused decisions: hardcoded secrets detection, auth middleware enforcement.
+Security-focused decisions: hardcoded secrets detection, auth middleware enforcement with AND logic.
 
-Covers: credential patterns, regex content scanning, test file exclusions.
+Covers: credential patterns, regex content scanning, test file exclusions, `content_match_mode: "all"` to require both a route definition AND auth middleware in the same file.
 
 ### `database`
 

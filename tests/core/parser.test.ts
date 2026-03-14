@@ -48,4 +48,212 @@ some random text
         expect(result.decisions[0].id).toBe('DECISION-001');
         expect(result.decisions[1].id).toBe('DECISION-002');
     });
+
+    // ── BUG-009 Regression — exclude-only Files warning ───────────────────────
+
+    describe('BUG-009 Regression — exclude-only Files patterns', () => {
+        it('should emit a warning when all Files patterns are exclusions', async () => {
+            const content = `
+<!-- DECISION-EXCL-001 -->
+## Decision: Exclude-only test
+**Status**: Active
+**Severity**: Warning
+**Date**: 2024-01-01
+
+**Files**:
+- \`!src/**/*.test.ts\`
+            `;
+
+            const result = await parser.parseContent(content, 'excl-test.md');
+
+            // Decision still parsed successfully
+            expect(result.decisions).toHaveLength(1);
+            expect(result.decisions[0].id).toBe('DECISION-EXCL-001');
+
+            // Warning must be present
+            const exclWarning = result.warnings.find(w => w.includes('DECISION-EXCL-001'));
+            expect(exclWarning).toBeDefined();
+            expect(exclWarning).toMatch(/all.*files.*patterns.*exclusions/i);
+        });
+
+        it('should NOT warn when at least one include pattern is present alongside exclusions', async () => {
+            const content = `
+<!-- DECISION-MIXED-001 -->
+## Decision: Mixed patterns
+**Status**: Active
+**Severity**: Warning
+**Date**: 2024-01-01
+
+**Files**:
+- \`src/**/*.ts\`
+- \`!src/**/*.test.ts\`
+            `;
+
+            const result = await parser.parseContent(content, 'mixed-test.md');
+
+            expect(result.decisions).toHaveLength(1);
+            const exclWarnings = result.warnings.filter(w =>
+                /all.*files.*patterns.*exclusions/i.test(w)
+            );
+            expect(exclWarnings).toHaveLength(0);
+        });
+    });
+
+    // ── BUG-008 Regression — duplicate decision IDs ───────────────────────────
+
+
+    describe('BUG-008 Regression — duplicate decision ID deduplication', () => {
+        it('should keep only the first occurrence and emit a warning when two blocks share the same ID', async () => {
+            const content = `
+<!-- DECISION-DUP-001 -->
+## Decision: First version (Critical)
+**Status**: Active
+**Severity**: Critical
+**Date**: 2024-01-01
+
+<!-- DECISION-DUP-001 -->
+## Decision: Second version (Warning)
+**Status**: Active
+**Severity**: Warning
+**Date**: 2024-01-01
+            `;
+
+            const result = await parser.parseContent(content, 'dup-test.md');
+
+            // Only one decision should survive
+            expect(result.decisions).toHaveLength(1);
+            expect(result.decisions[0].severity).toBe('critical');
+
+            // A warning must have been emitted
+            expect(result.warnings.length).toBeGreaterThan(0);
+            const dupWarning = result.warnings.find(w => w.includes('DECISION-DUP-001'));
+            expect(dupWarning).toBeDefined();
+            expect(dupWarning).toMatch(/duplicate decision id/i);
+        });
+
+        it('should keep only the first when three blocks share the same ID', async () => {
+            const content = `
+<!-- DECISION-TRIPLE-001 -->
+## Decision: Version A
+**Status**: Active
+**Severity**: Critical
+**Date**: 2024-01-01
+
+<!-- DECISION-TRIPLE-001 -->
+## Decision: Version B
+**Status**: Active
+**Severity**: Warning
+**Date**: 2024-01-01
+
+<!-- DECISION-TRIPLE-001 -->
+## Decision: Version C
+**Status**: Active
+**Severity**: Info
+**Date**: 2024-01-01
+            `;
+
+            const result = await parser.parseContent(content, 'triple-test.md');
+
+            expect(result.decisions).toHaveLength(1);
+            expect(result.decisions[0].title).toBe('Version A');
+            // Two warnings — one for each duplicate
+            const dupWarnings = result.warnings.filter(w => w.includes('DECISION-TRIPLE-001'));
+            expect(dupWarnings).toHaveLength(2);
+        });
+
+        it('should not affect decisions with unique IDs', async () => {
+            const content = `
+<!-- DECISION-UNIQUE-001 -->
+## Decision: Alpha
+**Status**: Active
+**Severity**: Critical
+**Date**: 2024-01-01
+
+<!-- DECISION-UNIQUE-002 -->
+## Decision: Beta
+**Status**: Active
+**Severity**: Warning
+**Date**: 2024-01-01
+            `;
+
+            const result = await parser.parseContent(content, 'unique-test.md');
+
+            expect(result.decisions).toHaveLength(2);
+            const dupWarnings = result.warnings.filter(w => /duplicate decision id/i.test(w));
+            expect(dupWarnings).toHaveLength(0);
+        });
+
+        it('should emit no duplicate warning for a single decision', async () => {
+            const content = `
+<!-- DECISION-SOLO-001 -->
+## Decision: Solo
+**Status**: Active
+**Severity**: Info
+**Date**: 2024-01-01
+            `;
+
+            const result = await parser.parseContent(content, 'solo-test.md');
+
+            expect(result.decisions).toHaveLength(1);
+            const dupWarnings = result.warnings.filter(w => /duplicate decision id/i.test(w));
+            expect(dupWarnings).toHaveLength(0);
+        });
+    });
+
+    describe('BUG-011 Regression — missing external rules', () => {
+        it('should emit an error and drop the decision when an external rules file fails to load', async () => {
+            const content = `
+<!-- DECISION-EXT-001 -->
+## Decision: External missing
+**Status**: Active
+**Severity**: Critical
+**Date**: 2024-01-01
+
+**Files**:
+- \`src/**/*.ts\`
+
+**Rules**: [rules](./rules/NONEXISTENT.json)
+            `;
+
+            const result = await parser.parseContent(content, 'test.md');
+
+            // The decision should NOT be added to decisions (it shouldn't degrade to glob-only)
+            expect(result.decisions).toHaveLength(0);
+
+            // An error should be emitted, not a warning
+            expect(result.errors).toHaveLength(1);
+            expect(result.errors[0].message).toMatch(/DECISION-EXT-001: Failed to load external rules/i);
+
+            // Warnings array should not contain this failure
+            const extWarnings = result.warnings.filter(w => /Failed to load external rules/i.test(w));
+            expect(extWarnings).toHaveLength(0);
+        });
+    });
+
+    // ── BUG-012 Regression — empty and whitespace-only decision files ──────────
+
+    describe('BUG-012 Regression — empty and whitespace-only decision files', () => {
+        it('should emit a warning for completely empty files', async () => {
+            const result = await parser.parseContent('', 'empty.md');
+            expect(result.decisions).toHaveLength(0);
+            expect(result.warnings).toHaveLength(1);
+            expect(result.warnings[0]).toMatch(/empty or contains no decisions/i);
+        });
+
+        it('should emit a warning for whitespace-only files', async () => {
+            const result = await parser.parseContent('   \n\t  ', 'whitespace.md');
+            expect(result.decisions).toHaveLength(0);
+            expect(result.warnings).toHaveLength(1);
+            expect(result.warnings[0]).toMatch(/empty or contains no decisions/i);
+        });
+
+        it('should emit a warning for files with content but no decision markers', async () => {
+            const content = '# Title\nSome content without markers.';
+            const result = await parser.parseContent(content, 'nomarkers.md');
+            expect(result.decisions).toHaveLength(0);
+            expect(result.warnings).toHaveLength(1);
+            expect(result.warnings[0]).toMatch(/empty or contains no decisions/i);
+        });
+    });
 });
+

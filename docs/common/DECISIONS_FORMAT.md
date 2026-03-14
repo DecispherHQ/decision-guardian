@@ -272,6 +272,7 @@ or
   "type": "file",
   "pattern": "src/**/*.ts",      // Glob pattern
   "exclude": "**/*.test.ts",     // Optional exclusion
+  "content_match_mode": "any",   // Optional: "any" (OR, default) | "all" (AND)
   "content_rules": [...]          // Optional content matching
 }
 ```
@@ -281,6 +282,7 @@ or
 | `type` | `"file"` | Yes | Must be `"file"` |
 | `pattern` | String | Yes | Glob pattern for file matching |
 | `exclude` | String | No | Glob pattern to exclude files |
+| `content_match_mode` | `"any"` \| `"all"` | No | How `content_rules` are combined. `"any"` (default) fires if **any** rule matches; `"all"` fires only when **every** rule matches |
 | `content_rules` | Array | No | Rules to match within file diff |
 
 ---
@@ -288,6 +290,16 @@ or
 ## Content Matching
 
 Rules for matching within file diffs.
+
+### Common Properties
+
+All content rules (except `full_file`) support these optional boolean properties to control exactly which parts of a git diff are searched:
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `match_changed_lines_only` | Boolean | `false` | By default, matchers search the entire file if it was modified. Set to `true` to restrict the search **strictly** to the lines that were changed in the diff. |
+| `match_deleted_lines` | Boolean | `false` | By default, only added (`+`) lines in the diff are searched. Set to `true` to also search lines that were removed (`-`). Useful for catching when a developer deletes a security guardrail. |
+
 
 ### 1. String Mode
 
@@ -421,6 +433,24 @@ Triggers if **either** file changes.
 ```
 
 Triggers only if **both** change.
+
+### AND Logic within a single file rule (`content_match_mode: "all"`)
+
+Use `content_match_mode: "all"` on a `FileRule` to require that **every** entry in `content_rules` matches (AND). The default is `"any"` (OR — fires if at least one rule matches).
+
+```json
+{
+  "type": "file",
+  "pattern": "src/api/**/*.ts",
+  "content_match_mode": "all",
+  "content_rules": [
+    { "mode": "string", "patterns": ["router.post("] },
+    { "mode": "regex", "pattern": "authMiddleware" }
+  ]
+}
+```
+
+Triggers only when a changed file **both** contains `router.post(` **and** matches `authMiddleware`.
 
 ### Nested Logic
 
@@ -632,7 +662,6 @@ Lines 1-10 contain license header. Changes require legal approval.
 | `Failed to parse JSON rules` | Invalid JSON | Validate with JSON linter |
 | `Rule nesting exceeds max depth` | >10 levels | Flatten structure |
 | `Invalid regex pattern` | Bad regex syntax | Test regex first |
-| `Line range start must be <= end` | start > end | Swap values |
 | `Unsafe regex pattern detected` | ReDoS risk | Simplify pattern |
 
 ### Validation Warnings

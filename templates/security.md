@@ -56,7 +56,7 @@ Hardcoded secrets must never appear in source code. Use environment variables or
 ---
 
 <!-- DECISION-SEC-002 -->
-## Decision: Auth Middleware Required
+## Decision: Auth Middleware Required on Mutating Routes
 **Status**: Active
 **Date**: 2024-04-15
 **Severity**: Critical
@@ -72,20 +72,30 @@ Hardcoded secrets must never appear in source code. Use environment variables or
     {
       "type": "file",
       "pattern": "src/routes/**/*.ts",
+      "content_match_mode": "all",
       "content_rules": [
         {
           "mode": "string",
-          "patterns": ["router.get(", "router.post(", "router.put(", "router.delete(", "app.get(", "app.post("]
+          "patterns": ["router.post(", "router.put(", "router.delete(", "app.post(", "app.put(", "app.delete("]
+        },
+        {
+          "mode": "regex",
+          "pattern": "authenticate|authMiddleware|requireAuth"
         }
       ]
     },
     {
       "type": "file",
       "pattern": "src/api/**/*.ts",
+      "content_match_mode": "all",
       "content_rules": [
         {
           "mode": "string",
-          "patterns": ["router.get(", "router.post(", "router.put(", "router.delete(", "app.get(", "app.post("]
+          "patterns": ["router.post(", "router.put(", "router.delete(", "app.post(", "app.put(", "app.delete("]
+        },
+        {
+          "mode": "regex",
+          "pattern": "authenticate|authMiddleware|requireAuth"
         }
       ]
     }
@@ -94,7 +104,9 @@ Hardcoded secrets must never appear in source code. Use environment variables or
 ```
 
 ### Context
-All route handlers must use the authentication middleware. Changes to route files require security review.
+Fires only when a changed route file **both** defines a mutating endpoint (POST/PUT/DELETE) **and** references
+an auth middleware in the same diff. Uses `content_match_mode: "all"` for per-file AND logic — both
+`content_rules` must match the same file for the decision to trigger.
 
 ---
 

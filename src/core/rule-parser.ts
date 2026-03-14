@@ -126,6 +126,16 @@ export class RuleParser {
       throw new Error('FileRule must have a pattern');
     }
 
+    if (rule.content_match_mode && !['any', 'all'].includes(rule.content_match_mode)) {
+      throw new Error(
+        `Invalid content_match_mode: "${rule.content_match_mode}". Must be "any" or "all"`,
+      );
+    }
+
+    if (!rule.content_match_mode) {
+      rule.content_match_mode = 'any';
+    }
+
     if (rule.content_rules && Array.isArray(rule.content_rules)) {
       for (const contentRule of rule.content_rules) {
         this.validateContentRule(contentRule);
@@ -145,8 +155,17 @@ export class RuleParser {
 
     switch (rule.mode) {
       case 'string': {
+        // BUG-002 fix: accept singular `pattern` string and coerce to `patterns` array.
         if (!rule.patterns || !Array.isArray(rule.patterns)) {
-          throw new Error('String mode requires patterns array');
+          if (typeof rule.pattern === 'string' && rule.pattern.length > 0) {
+            // Auto-coerce singular pattern → patterns array so the rule works correctly.
+            (rule as unknown as Record<string, unknown>).patterns = [rule.pattern];
+          } else {
+            throw new Error(
+              'String mode requires a "patterns" array (e.g. {"mode":"string","patterns":["foo"]}) ' +
+                'or a singular "pattern" string (e.g. {"mode":"string","pattern":"foo"})',
+            );
+          }
         }
         break;
       }
@@ -183,7 +202,10 @@ export class RuleParser {
           throw new Error('Line range mode requires start and end numbers');
         }
         if (rule.start > rule.end) {
-          throw new Error('Line range start must be <= end');
+          // BUG-010 fix: Auto-correct inverted line range instead of throwing an error
+          const temp = rule.start;
+          rule.start = rule.end;
+          rule.end = temp;
         }
         break;
       case 'json_path':

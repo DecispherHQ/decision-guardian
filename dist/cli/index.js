@@ -8347,6 +8347,10 @@ async function runCheck(opts) {
                 process.exit(1);
             }
         }
+        if (opts.failOnError && parseResult.warnings.length > 0) {
+            logger.error(`Check failed: ${parseResult.warnings.length} rule parse warning(s) found (fail-on-error enabled)`);
+            process.exit(1);
+        }
         if (parseResult.decisions.length === 0) {
             logger.warning('No decisions found in the specified path.');
             process.exit(0);
@@ -8738,7 +8742,7 @@ class ContentMatchers {
      * Match string patterns in changed lines
      */
     matchString(rule, fileDiff) {
-        const changedLines = this.getChangedLines(fileDiff.patch);
+        const changedLines = this.getChangedLines(fileDiff.patch, rule.match_deleted_lines ?? false);
         const matchedPatterns = [];
         for (const pattern of rule.patterns || []) {
             if (changedLines.some((line) => line.includes(pattern))) {
@@ -8767,7 +8771,7 @@ class ContentMatchers {
             });
             return { matched: false, matchedPatterns: [] };
         }
-        const changedContent = this.getChangedLines(fileDiff.patch).join('\n');
+        const changedContent = this.getChangedLines(fileDiff.patch, rule.match_deleted_lines ?? false).join('\n');
         const MAX_CONTENT_SIZE = 1024 * 1024;
         if (changedContent.length > MAX_CONTENT_SIZE) {
             (0, logger_1.logStructured)(this.logger, 'warning', `[Security] Content exceeds size limit`, {
@@ -8846,7 +8850,7 @@ class ContentMatchers {
      * Match if changes occur within specified line range
      */
     matchLineRange(rule, fileDiff) {
-        const changedLineNumbers = this.extractChangedLineNumbers(fileDiff.patch);
+        const changedLineNumbers = this.extractChangedLineNumbers(fileDiff.patch, rule.match_deleted_lines ?? false);
         const matched = changedLineNumbers.some((lineNum) => lineNum >= rule.start && lineNum <= rule.end);
         return {
             matched,
@@ -8864,33 +8868,37 @@ class ContentMatchers {
     }
     /**
      * JSON path mode - check if specific JSON keys changed
-     *
-     * Improved heuristic: all keys in the dotted path must appear as
-     * `"key"\s*:` in the changed lines, and each subsequent key must
-     * appear at a line number >= the previous key's line number.
-     * This enforces hierarchical ordering without needing the full file.
      */
     matchJsonPath(rule, fileDiff) {
-        const changedLines = this.getChangedLinesWithNumbers(fileDiff.patch);
+        // Lines that include context (normal) lines so ancestor keys are visible
+        // even when only a leaf value was edited in-place.
+        const allLines = this.getChangedLinesWithContext(fileDiff.patch);
         const matchedPatterns = [];
         for (const jsonPath of rule.paths || []) {
             const keys = jsonPath.split('.');
             let minLine = -1;
             let allKeysFound = true;
-            for (const key of keys) {
+            let leafIsAdded = false;
+            for (let i = 0; i < keys.length; i++) {
+                const key = keys[i];
+                const isLeaf = i === keys.length - 1;
                 const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                 const keyRegex = new RegExp(`"${escapedKey}"\\s*:`);
-                // Find the first matching line at or after minLine
-                const match = changedLines.find((line) => line.lineNumber >= minLine && keyRegex.test(line.content));
+                // Find the first line (added OR context) at or after minLine that
+                // contains the key.
+                const match = allLines.find((line) => line.lineNumber >= minLine && keyRegex.test(line.content));
                 if (match) {
                     minLine = match.lineNumber;
+                    if (isLeaf) {
+                        leafIsAdded = match.isAdded;
+                    }
                 }
                 else {
                     allKeysFound = false;
                     break;
                 }
             }
-            if (allKeysFound) {
+            if (allKeysFound && leafIsAdded) {
                 matchedPatterns.push(jsonPath);
             }
         }
@@ -8918,7 +8926,7 @@ class ContentMatchers {
     /**
      * Extract changed (added) lines from diff using parse-diff
      */
-    getChangedLines(patch) {
+    getChangedLines(patch, includeDeleted = false) {
         if (!patch)
             return [];
         try {
@@ -8932,6 +8940,9 @@ ${patch}`;
                 for (const chunk of file.chunks) {
                     for (const change of chunk.changes) {
                         if (change.type === 'add') {
+                            lines.push(change.content.substring(1));
+                        }
+                        else if (includeDeleted && change.type === 'del') {
                             lines.push(change.content.substring(1));
                         }
                     }
@@ -8949,7 +8960,7 @@ ${patch}`;
     /**
      * Extract line numbers of changed lines using parse-diff
      */
-    extractChangedLineNumbers(patch) {
+    extractChangedLineNumbers(patch, includeDeleted = false) {
         if (!patch)
             return [];
         try {
@@ -8964,6 +8975,9 @@ ${patch}`;
                     for (const change of chunk.changes) {
                         if (change.type === 'add' && change.ln) {
                             lineNumbers.push(change.ln);
+                        }
+                        else if (includeDeleted && change.type === 'del' && change.ln1) {
+                            lineNumbers.push(change.ln1);
                         }
                     }
                 }
@@ -9006,6 +9020,55 @@ ${patch}`;
         }
         catch (error) {
             (0, logger_1.logStructured)(this.logger, 'warning', `[Parsing] Failed to parse diff content with line numbers`, {
+                error: String(error),
+            });
+            return [];
+        }
+    }
+    /**
+     * Extract both added (+) and context lines with their new-file line numbers
+     * and an `isAdded` flag.  Used by matchJsonPath so that ancestor keys which
+     * appear as unchanged context lines are still visible when scanning for a
+     * nested path whose leaf value was edited in-place (BUG-003).
+     */
+    getChangedLinesWithContext(patch) {
+        if (!patch)
+            return [];
+        try {
+            const fullDiff = `diff --git a/file b/file
+--- a/file
++++ b/file
+${patch}`;
+            const parsed = (0, parse_diff_1.default)(fullDiff);
+            const lines = [];
+            for (const file of parsed) {
+                for (const chunk of file.chunks) {
+                    for (const change of chunk.changes) {
+                        if (change.type === 'add' && change.ln != null) {
+                            // Added line — strip the leading '+'
+                            lines.push({
+                                content: change.content.substring(1),
+                                lineNumber: change.ln,
+                                isAdded: true,
+                            });
+                        }
+                        else if (change.type === 'normal' && change.ln2 != null) {
+                            // Context (unchanged) line — strip the leading ' '
+                            lines.push({
+                                content: change.content.substring(1),
+                                lineNumber: change.ln2,
+                                isAdded: false,
+                            });
+                        }
+                        // Deleted lines are intentionally excluded — they no longer
+                        // exist in the new file and should not anchor path matching.
+                    }
+                }
+            }
+            return lines;
+        }
+        catch (error) {
+            (0, logger_1.logStructured)(this.logger, 'warning', `[Parsing] Failed to parse diff content with context lines`, {
                 error: String(error),
             });
             return [];
@@ -9499,6 +9562,9 @@ class DecisionParser {
         const errors = [];
         const warnings = [];
         const blocks = this.splitIntoBlocks(content);
+        if (blocks.length === 0) {
+            warnings.push(`Decision file is empty or contains no decisions: ${path.basename(sourceFile)}`);
+        }
         for (const block of blocks) {
             try {
                 const decision = await this.parseBlock(block, sourceFile, warnings);
@@ -9521,7 +9587,22 @@ class DecisionParser {
                 });
             }
         }
-        return { decisions, errors, warnings };
+        // Deduplicate by ID — keep first occurrence, warn on subsequent duplicates
+        const seenIds = new Map(); // id -> line number of first occurrence
+        const deduped = [];
+        for (const decision of decisions) {
+            const firstLine = seenIds.get(decision.id);
+            if (firstLine !== undefined) {
+                warnings.push(`Duplicate decision ID "${decision.id}" at line ${decision.lineNumber} ` +
+                    `(first seen at line ${firstLine} in ${sourceFile}). ` +
+                    `Only the first occurrence will be evaluated; the duplicate is ignored.`);
+            }
+            else {
+                seenIds.set(decision.id, decision.lineNumber);
+                deduped.push(decision);
+            }
+        }
+        return { decisions: deduped, errors, warnings };
     }
     /**
      * Split content into decision blocks
@@ -9570,9 +9651,16 @@ class DecisionParser {
         const severityRaw = this.extractField(content, 'Severity', 'info');
         this.validateDate(date, id, warnings);
         const files = this.extractFilesList(content);
+        // Warn when every Files pattern is an exclusion — the decision would match
+        // no files at all without at least one include pattern.
+        if (files.length > 0 && files.every((f) => f.startsWith('!'))) {
+            warnings.push(`${id}: All "Files" patterns are exclusions (start with "!"). ` +
+                `The decision will match every file except those excluded. ` +
+                `Add at least one include pattern (e.g. "**") if that is intentional.`);
+        }
         const ruleResult = await this.ruleParser.extractRules(content, sourceFile);
         if (ruleResult.error) {
-            warnings.push(`${id}: ${ruleResult.error}`);
+            throw new Error(`${id}: ${ruleResult.error}`);
         }
         const contextMatch = content.match(/###\s*Context\s*\n([\s\S]+?)(?=\n---+|\n<!--|$)/);
         const context = contextMatch ? contextMatch[1].trim() : '';
@@ -9804,7 +9892,7 @@ class RuleEvaluator {
             const allMatchedPatterns = [];
             const allMatchedFiles = [];
             for (const file of matchingFiles) {
-                const contentResult = await this.evaluateContentRules(rule.content_rules, file);
+                const contentResult = await this.evaluateContentRules(rule.content_rules, file, rule.content_match_mode);
                 if (contentResult.matched) {
                     allMatchedPatterns.push(...contentResult.matchedPatterns);
                     allMatchedFiles.push(file.filename);
@@ -9830,10 +9918,12 @@ class RuleEvaluator {
         }
     }
     /**
-     * Evaluate content rules against a file diff
+     * Evaluate content rules against a file diff.
+     * contentMatchMode 'all' requires every rule to match (AND); 'any' (default) requires at least one (OR).
      */
-    async evaluateContentRules(rules, file) {
+    async evaluateContentRules(rules, file, contentMatchMode = 'any') {
         const allMatchedPatterns = [];
+        let anyMatched = false;
         for (const rule of rules) {
             let result;
             switch (rule.mode) {
@@ -9858,11 +9948,16 @@ class RuleEvaluator {
                 }
             }
             if (result.matched) {
+                anyMatched = true;
                 allMatchedPatterns.push(...result.matchedPatterns);
+            }
+            else if (contentMatchMode === 'all') {
+                // Short-circuit: one unmatched rule breaks AND logic
+                return { matched: false, matchedPatterns: [] };
             }
         }
         return {
-            matched: allMatchedPatterns.length > 0,
+            matched: anyMatched,
             matchedPatterns: allMatchedPatterns.sort(),
         };
     }
@@ -10021,6 +10116,12 @@ class RuleParser {
         if (!rule.pattern) {
             throw new Error('FileRule must have a pattern');
         }
+        if (rule.content_match_mode && !['any', 'all'].includes(rule.content_match_mode)) {
+            throw new Error(`Invalid content_match_mode: "${rule.content_match_mode}". Must be "any" or "all"`);
+        }
+        if (!rule.content_match_mode) {
+            rule.content_match_mode = 'any';
+        }
         if (rule.content_rules && Array.isArray(rule.content_rules)) {
             for (const contentRule of rule.content_rules) {
                 this.validateContentRule(contentRule);
@@ -10037,8 +10138,16 @@ class RuleParser {
         }
         switch (rule.mode) {
             case 'string': {
+                // BUG-002 fix: accept singular `pattern` string and coerce to `patterns` array.
                 if (!rule.patterns || !Array.isArray(rule.patterns)) {
-                    throw new Error('String mode requires patterns array');
+                    if (typeof rule.pattern === 'string' && rule.pattern.length > 0) {
+                        // Auto-coerce singular pattern → patterns array so the rule works correctly.
+                        rule.patterns = [rule.pattern];
+                    }
+                    else {
+                        throw new Error('String mode requires a "patterns" array (e.g. {"mode":"string","patterns":["foo"]}) ' +
+                            'or a singular "pattern" string (e.g. {"mode":"string","pattern":"foo"})');
+                    }
                 }
                 break;
             }
@@ -10073,7 +10182,10 @@ class RuleParser {
                     throw new Error('Line range mode requires start and end numbers');
                 }
                 if (rule.start > rule.end) {
-                    throw new Error('Line range start must be <= end');
+                    // BUG-010 fix: Auto-correct inverted line range instead of throwing an error
+                    const temp = rule.start;
+                    rule.start = rule.end;
+                    rule.end = temp;
                 }
                 break;
             case 'json_path':
@@ -10133,8 +10245,14 @@ class PatternTrie {
     constructor(decisions) {
         this.root = this.createNode();
         for (const decision of decisions) {
-            for (const pattern of decision.files) {
-                if (!pattern.startsWith('!')) {
+            const includePatterns = decision.files.filter((p) => !p.startsWith('!'));
+            if (includePatterns.length === 0 && decision.files.length > 0) {
+                // Decision has only exclusion patterns — insert under ** so it receives candidates
+                // for every file. The exclusion logic in matchesDecision() still applies.
+                this.insert('**', decision);
+            }
+            else {
+                for (const pattern of includePatterns) {
                     this.insert(pattern, decision);
                 }
             }

@@ -34,7 +34,7 @@ export class ContentMatchers {
     rule: ContentRule,
     fileDiff: FileDiff,
   ): { matched: boolean; matchedPatterns: string[] } {
-    const changedLines = this.getChangedLines(fileDiff.patch);
+    const changedLines = this.getChangedLines(fileDiff.patch, rule.match_deleted_lines ?? false);
     const matchedPatterns: string[] = [];
 
     for (const pattern of rule.patterns || []) {
@@ -71,7 +71,10 @@ export class ContentMatchers {
       return { matched: false, matchedPatterns: [] };
     }
 
-    const changedContent = this.getChangedLines(fileDiff.patch).join('\n');
+    const changedContent = this.getChangedLines(
+      fileDiff.patch,
+      rule.match_deleted_lines ?? false,
+    ).join('\n');
     const MAX_CONTENT_SIZE = 1024 * 1024;
 
     if (changedContent.length > MAX_CONTENT_SIZE) {
@@ -169,7 +172,10 @@ export class ContentMatchers {
     rule: ContentRule,
     fileDiff: FileDiff,
   ): { matched: boolean; matchedPatterns: string[] } {
-    const changedLineNumbers = this.extractChangedLineNumbers(fileDiff.patch);
+    const changedLineNumbers = this.extractChangedLineNumbers(
+      fileDiff.patch,
+      rule.match_deleted_lines ?? false,
+    );
 
     const matched = changedLineNumbers.some(
       (lineNum) => lineNum >= rule.start! && lineNum <= rule.end!,
@@ -193,42 +199,46 @@ export class ContentMatchers {
 
   /**
    * JSON path mode - check if specific JSON keys changed
-   *
-   * Improved heuristic: all keys in the dotted path must appear as
-   * `"key"\s*:` in the changed lines, and each subsequent key must
-   * appear at a line number >= the previous key's line number.
-   * This enforces hierarchical ordering without needing the full file.
    */
   matchJsonPath(
     rule: ContentRule,
     fileDiff: FileDiff,
   ): { matched: boolean; matchedPatterns: string[] } {
-    const changedLines = this.getChangedLinesWithNumbers(fileDiff.patch);
+    // Lines that include context (normal) lines so ancestor keys are visible
+    // even when only a leaf value was edited in-place.
+    const allLines = this.getChangedLinesWithContext(fileDiff.patch);
     const matchedPatterns: string[] = [];
 
     for (const jsonPath of rule.paths || []) {
       const keys = jsonPath.split('.');
       let minLine = -1;
       let allKeysFound = true;
+      let leafIsAdded = false;
 
-      for (const key of keys) {
+      for (let i = 0; i < keys.length; i++) {
+        const key = keys[i];
+        const isLeaf = i === keys.length - 1;
         const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const keyRegex = new RegExp(`"${escapedKey}"\\s*:`);
 
-        // Find the first matching line at or after minLine
-        const match = changedLines.find(
+        // Find the first line (added OR context) at or after minLine that
+        // contains the key.
+        const match = allLines.find(
           (line) => line.lineNumber >= minLine && keyRegex.test(line.content),
         );
 
         if (match) {
           minLine = match.lineNumber;
+          if (isLeaf) {
+            leafIsAdded = match.isAdded;
+          }
         } else {
           allKeysFound = false;
           break;
         }
       }
 
-      if (allKeysFound) {
+      if (allKeysFound && leafIsAdded) {
         matchedPatterns.push(jsonPath);
       }
     }
@@ -260,7 +270,7 @@ export class ContentMatchers {
   /**
    * Extract changed (added) lines from diff using parse-diff
    */
-  private getChangedLines(patch: string): string[] {
+  private getChangedLines(patch: string, includeDeleted = false): string[] {
     if (!patch) return [];
 
     try {
@@ -276,6 +286,8 @@ ${patch}`;
         for (const chunk of file.chunks) {
           for (const change of chunk.changes as ParsedChange[]) {
             if (change.type === 'add') {
+              lines.push(change.content.substring(1));
+            } else if (includeDeleted && change.type === 'del') {
               lines.push(change.content.substring(1));
             }
           }
@@ -294,7 +306,7 @@ ${patch}`;
   /**
    * Extract line numbers of changed lines using parse-diff
    */
-  private extractChangedLineNumbers(patch: string): number[] {
+  private extractChangedLineNumbers(patch: string, includeDeleted = false): number[] {
     if (!patch) return [];
 
     try {
@@ -311,6 +323,8 @@ ${patch}`;
           for (const change of chunk.changes as ParsedChange[]) {
             if (change.type === 'add' && change.ln) {
               lineNumbers.push(change.ln);
+            } else if (includeDeleted && change.type === 'del' && change.ln1) {
+              lineNumbers.push(change.ln1);
             }
           }
         }
@@ -359,6 +373,64 @@ ${patch}`;
         this.logger,
         'warning',
         `[Parsing] Failed to parse diff content with line numbers`,
+        {
+          error: String(error),
+        },
+      );
+      return [];
+    }
+  }
+
+  /**
+   * Extract both added (+) and context lines with their new-file line numbers
+   * and an `isAdded` flag.  Used by matchJsonPath so that ancestor keys which
+   * appear as unchanged context lines are still visible when scanning for a
+   * nested path whose leaf value was edited in-place (BUG-003).
+   */
+  private getChangedLinesWithContext(
+    patch: string,
+  ): { content: string; lineNumber: number; isAdded: boolean }[] {
+    if (!patch) return [];
+
+    try {
+      const fullDiff = `diff --git a/file b/file
+--- a/file
++++ b/file
+${patch}`;
+
+      const parsed = parseDiff(fullDiff);
+      const lines: { content: string; lineNumber: number; isAdded: boolean }[] = [];
+
+      for (const file of parsed) {
+        for (const chunk of file.chunks) {
+          for (const change of chunk.changes as ParsedChange[]) {
+            if (change.type === 'add' && change.ln != null) {
+              // Added line — strip the leading '+'
+              lines.push({
+                content: change.content.substring(1),
+                lineNumber: change.ln,
+                isAdded: true,
+              });
+            } else if (change.type === 'normal' && change.ln2 != null) {
+              // Context (unchanged) line — strip the leading ' '
+              lines.push({
+                content: change.content.substring(1),
+                lineNumber: change.ln2,
+                isAdded: false,
+              });
+            }
+            // Deleted lines are intentionally excluded — they no longer
+            // exist in the new file and should not anchor path matching.
+          }
+        }
+      }
+
+      return lines;
+    } catch (error) {
+      logStructured(
+        this.logger,
+        'warning',
+        `[Parsing] Failed to parse diff content with context lines`,
         {
           error: String(error),
         },

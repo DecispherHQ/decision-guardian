@@ -12,8 +12,13 @@ export class PatternTrie {
   constructor(decisions: Decision[]) {
     this.root = this.createNode();
     for (const decision of decisions) {
-      for (const pattern of decision.files) {
-        if (!pattern.startsWith('!')) {
+      const includePatterns = decision.files.filter((p) => !p.startsWith('!'));
+      if (includePatterns.length === 0 && decision.files.length > 0) {
+        // Decision has only exclusion patterns — insert under ** so it receives candidates
+        // for every file. The exclusion logic in matchesDecision() still applies.
+        this.insert('**', decision);
+      } else {
+        for (const pattern of includePatterns) {
           this.insert(pattern, decision);
         }
       }

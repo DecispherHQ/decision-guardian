@@ -384,7 +384,6 @@ describe('RuleParser', () => {
             expect(result.rules).toBeDefined();
             expect(result.rules?.conditions).toHaveLength(2);
         });
-
         it('should reject the old wrong template schema: {files:[...], content:{...}} without type or pattern', async () => {
             // The old (buggy) template format — conditions have no `type` and no `pattern` (string),
             // so isFileRule() returns false and they fall through as empty RuleConditions.
@@ -420,6 +419,113 @@ describe('RuleParser', () => {
         });
     });
 
+    describe('BUG-002 Regression — string mode singular pattern coercion', () => {
+        it('should accept singular "pattern" string in string mode and coerce to patterns array', async () => {
+            const content = `
+## DECISION-BUG002
+**Rules**: \`\`\`json
+{
+    "type": "file",
+    "pattern": "src/**/*.ts",
+    "content_rules": [
+        {
+            "mode": "string",
+            "pattern": "router.post("
+        }
+    ]
+}
+\`\`\`
+            `;
+
+            const result = await parser.extractRules(content, path.join(workspaceDir, 'decisions.md'));
+
+            // Must NOT fail — coercion must have happened silently
+            expect(result.error).toBeUndefined();
+            expect(result.rules).toBeDefined();
+        });
+
+        it('should coerce singular pattern and expose it as patterns array on the content rule object', async () => {
+            const content = `
+## DECISION-BUG002-B
+**Rules**: \`\`\`json
+{
+    "match_mode": "any",
+    "conditions": [
+        {
+            "type": "file",
+            "pattern": "src/**/*.ts",
+            "content_rules": [
+                {
+                    "mode": "string",
+                    "pattern": "router.post("
+                }
+            ]
+        }
+    ]
+}
+\`\`\`
+            `;
+
+            const result = await parser.extractRules(content, path.join(workspaceDir, 'decisions.md'));
+
+            expect(result.error).toBeUndefined();
+            expect(result.rules).toBeDefined();
+
+            // After coercion the content rule must expose a `patterns` array
+            const condition = result.rules?.conditions?.[0] as { content_rules?: Array<Record<string, unknown>> };
+            const contentRule = condition?.content_rules?.[0];
+            expect(Array.isArray(contentRule?.['patterns'])).toBe(true);
+            expect(contentRule?.['patterns']).toEqual(['router.post(']);
+        });
+
+        it('should leave existing patterns array untouched when patterns is already an array', async () => {
+            const content = `
+## DECISION-BUG002-C
+**Rules**: \`\`\`json
+{
+    "type": "file",
+    "pattern": "src/**/*.ts",
+    "content_rules": [
+        {
+            "mode": "string",
+            "patterns": ["router.post(", "router.put("]
+        }
+    ]
+}
+\`\`\`
+            `;
+
+            const result = await parser.extractRules(content, path.join(workspaceDir, 'decisions.md'));
+
+            expect(result.error).toBeUndefined();
+            expect(result.rules).toBeDefined();
+        });
+
+        it('should throw (and return error) for string mode with neither pattern nor patterns', async () => {
+            const content = `
+## DECISION-BUG002-D
+**Rules**: \`\`\`json
+{
+    "type": "file",
+    "pattern": "src/**/*.ts",
+    "content_rules": [
+        {
+            "mode": "string"
+        }
+    ]
+}
+\`\`\`
+            `;
+
+            const result = await parser.extractRules(content, path.join(workspaceDir, 'decisions.md'));
+
+            // Neither pattern nor patterns provided — should still be an error
+            expect(result.rules).toBeNull();
+            expect(result.error).toBeDefined();
+            expect(result.error).toContain('String mode requires');
+        });
+    });
+
     describe('No Rules', () => {
         it('should return null when no rules found', async () => {
             const content = `
@@ -431,6 +537,157 @@ This is a decision without rules.
 
             expect(result.rules).toBeNull();
             expect(result.error).toBeUndefined();
+        });
+    });
+
+    describe('BUG-005 Regression — content_match_mode validation', () => {
+        it('should accept content_match_mode: "any" on a FileRule', async () => {
+            const content = `
+## DECISION-BUG005-A
+**Rules**: \`\`\`json
+{
+    "type": "file",
+    "pattern": "src/**/*.ts",
+    "content_match_mode": "any",
+    "content_rules": [
+        { "mode": "string", "patterns": ["router.post("] },
+        { "mode": "regex", "pattern": "authMiddleware" }
+    ]
+}
+\`\`\`
+            `;
+
+            const result = await parser.extractRules(content, path.join(workspaceDir, 'decisions.md'));
+
+            expect(result.error).toBeUndefined();
+            expect(result.rules).toBeDefined();
+        });
+
+        it('should accept content_match_mode: "all" on a FileRule', async () => {
+            const content = `
+## DECISION-BUG005-B
+**Rules**: \`\`\`json
+{
+    "type": "file",
+    "pattern": "src/**/*.ts",
+    "content_match_mode": "all",
+    "content_rules": [
+        { "mode": "string", "patterns": ["router.post("] },
+        { "mode": "regex", "pattern": "authMiddleware" }
+    ]
+}
+\`\`\`
+            `;
+
+            const result = await parser.extractRules(content, path.join(workspaceDir, 'decisions.md'));
+
+            expect(result.error).toBeUndefined();
+            expect(result.rules).toBeDefined();
+        });
+
+        it('should reject an invalid content_match_mode value', async () => {
+            const content = `
+## DECISION-BUG005-C
+**Rules**: \`\`\`json
+{
+    "type": "file",
+    "pattern": "src/**/*.ts",
+    "content_match_mode": "invalid",
+    "content_rules": [
+        { "mode": "string", "patterns": ["foo"] }
+    ]
+}
+\`\`\`
+            `;
+
+            const result = await parser.extractRules(content, path.join(workspaceDir, 'decisions.md'));
+
+            expect(result.rules).toBeNull();
+            expect(result.error).toContain('Invalid content_match_mode');
+        });
+
+        it('should accept content_match_mode: "all" inside a conditions array', async () => {
+            const content = `
+## DECISION-BUG005-D
+**Rules**: \`\`\`json
+{
+    "match_mode": "all",
+    "conditions": [
+        {
+            "type": "file",
+            "pattern": "src/api/**/*.ts",
+            "content_match_mode": "all",
+            "content_rules": [
+                { "mode": "string", "patterns": ["router.post("] },
+                { "mode": "regex", "pattern": "authMiddleware" }
+            ]
+        }
+    ]
+}
+\`\`\`
+            `;
+
+            const result = await parser.extractRules(content, path.join(workspaceDir, 'decisions.md'));
+
+            expect(result.error).toBeUndefined();
+            expect(result.rules).toBeDefined();
+            expect(result.rules?.conditions).toHaveLength(1);
+        });
+
+        it('should default content_match_mode to "any" when missing', async () => {
+            const content = `
+## DECISION-BUG005-E
+**Rules**: \`\`\`json
+{
+    "type": "file",
+    "pattern": "src/**/*.ts",
+    "content_rules": [
+        { "mode": "string", "patterns": ["router.post("] }
+    ]
+}
+\`\`\`
+            `;
+
+            const result = await parser.extractRules(content, path.join(workspaceDir, 'decisions.md'));
+
+            expect(result.error).toBeUndefined();
+            expect(result.rules).toBeDefined();
+
+            // When no conditions structure is used, rules itself is the FileRule
+            const rule = result.rules as unknown as { content_match_mode: string };
+            expect(rule.content_match_mode).toBe('any');
+        });
+    });
+    
+    describe('BUG-010 Regression — line_range inverted range degrades to glob-only match', () => {
+        it('should swap start and end when start > end instead of throwing an error', async () => {
+            const content = `
+## DECISION-BUG010
+**Rules**: \`\`\`json
+{
+    "type": "file",
+    "pattern": "src/**/*.ts",
+    "content_rules": [
+        {
+            "mode": "line_range",
+            "start": 100,
+            "end": 1
+        }
+    ]
+}
+\`\`\`
+            `;
+
+            const result = await parser.extractRules(content, path.join(workspaceDir, 'decisions.md'));
+
+            expect(result.error).toBeUndefined();
+            expect(result.rules).toBeDefined();
+
+            // After coercion the content rule must have start <= end
+            const rule = result.rules as unknown as { content_rules: Array<{start: number, end: number}> };
+            const contentRule = rule.content_rules[0];
+            expect(contentRule.start).toBe(1);
+            expect(contentRule.end).toBe(100);
         });
     });
 });

@@ -39,14 +39,19 @@ jobs:
       
       - name: Build CLI
         run: npm run build:cli
-      
-      - name: Check dist/
+
+      - name: Verify dist is up to date
         run: |
-          if ! git diff --quiet --exit-code --ignore-space-at-eol -- dist/; then
-            git --no-pager diff -- dist/
-            echo "Error: dist/ is out of date. Run 'npm run bundle' and 'npm run build:cli' and commit."
+          if ! git diff --quiet dist/; then
+            echo ""
+            echo "❌ dist/ is out of date with the source!"
+            echo "   Run 'npm run bundle && npm run build:cli' locally and commit the result."
+            echo "   Tip: The pre-commit hook does this automatically — did you use --no-verify?"
+            echo ""
+            git diff --stat dist/
             exit 1
           fi
+          echo "✅ dist/ is in sync with source."
 
   cli-smoke-test:
     runs-on: ubuntu-latest
