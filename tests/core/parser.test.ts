@@ -48,4 +48,55 @@ some random text
         expect(result.decisions[0].id).toBe('DECISION-001');
         expect(result.decisions[1].id).toBe('DECISION-002');
     });
+
+    // ── BUG-009 Regression — exclude-only Files warning ───────────────────────
+
+    describe('BUG-009 Regression — exclude-only Files patterns', () => {
+        it('should emit a warning when all Files patterns are exclusions', async () => {
+            const content = `
+<!-- DECISION-EXCL-001 -->
+## Decision: Exclude-only test
+**Status**: Active
+**Severity**: Warning
+**Date**: 2024-01-01
+
+**Files**:
+- \`!src/**/*.test.ts\`
+            `;
+
+            const result = await parser.parseContent(content, 'excl-test.md');
+
+            // Decision still parsed successfully
+            expect(result.decisions).toHaveLength(1);
+            expect(result.decisions[0].id).toBe('DECISION-EXCL-001');
+
+            // Warning must be present
+            const exclWarning = result.warnings.find(w => w.includes('DECISION-EXCL-001'));
+            expect(exclWarning).toBeDefined();
+            expect(exclWarning).toMatch(/all.*files.*patterns.*exclusions/i);
+        });
+
+        it('should NOT warn when at least one include pattern is present alongside exclusions', async () => {
+            const content = `
+<!-- DECISION-MIXED-001 -->
+## Decision: Mixed patterns
+**Status**: Active
+**Severity**: Warning
+**Date**: 2024-01-01
+
+**Files**:
+- \`src/**/*.ts\`
+- \`!src/**/*.test.ts\`
+            `;
+
+            const result = await parser.parseContent(content, 'mixed-test.md');
+
+            expect(result.decisions).toHaveLength(1);
+            const exclWarnings = result.warnings.filter(w =>
+                /all.*files.*patterns.*exclusions/i.test(w)
+            );
+            expect(exclWarnings).toHaveLength(0);
+        });
+    });
 });
+
