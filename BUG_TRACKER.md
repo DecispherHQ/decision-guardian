@@ -25,4 +25,15 @@ This document tracks identified bugs, their severity, description, status, and t
 
 ---
 
+### [BUG-003] json_path nested paths fail for in-place value edits
+- **Severity**: 🔴 Critical
+- **Affects**: CLI, GitHub Action
+- **Status**: ✅ Fixed
+- **Branch**: `fix/BUG-003-json-path-nested-value-edit`
+- **Description**: `matchJsonPath()` scanned only added (`+`) diff lines when resolving dotted paths like `"database.password"`. For an in-place value edit (e.g. changing `"password": "old"` to `"password": "new"`), only the leaf `password` line appeared in the diff as an added line — the parent `"database": {` was an **unchanged context line** and therefore invisible to the matcher. The hierarchical scan failed to find the parent key, so `allKeysFound` became `false` and the path match silently returned no result. Any `json_path` rule with depth ≥ 2 was non-functional for value edits.
+- **Root Cause**: `getChangedLinesWithNumbers()` collected only `type === 'add'` lines. Context (normal) lines — which carry unchanged parent keys — were never included in the candidate set passed to `matchJsonPath()`.
+- **Resolution**: Added a new private helper `getChangedLinesWithContext()` that collects both `add` and `normal` (context) lines with their new-file line numbers, tagging each with an `isAdded` flag. `matchJsonPath()` now uses this richer set so ancestral keys found only in context lines are visible. To prevent false positives (matching a path that is purely contextual with no actual change), the **leaf key must still appear on an added line** (`leafIsAdded` guard). Four regression tests were added to `tests/core/content-matchers.test.ts` covering: 2-level in-place edit, 3-level deep in-place edit, false-positive guard (leaf only in context), and multiple-path partial match.
+
+---
+
 *(Add new bugs below!)*
