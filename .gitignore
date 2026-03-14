@@ -5,3 +5,10 @@ coverage/
 workers/telemetry/.wrangler/
 workers/telemetry/.dev.vars
 .decispher/
+
+# Ignore tsc-compiled output; only the ncc bundles are committed
+dist/
+!dist/index.js
+!dist/licenses.txt
+!dist/cli/index.js
+!dist/cli/licenses.txt
