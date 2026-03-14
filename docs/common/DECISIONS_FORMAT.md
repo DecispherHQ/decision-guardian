@@ -291,6 +291,16 @@ or
 
 Rules for matching within file diffs.
 
+### Common Properties
+
+All content rules (except `full_file`) support these optional boolean properties to control exactly which parts of a git diff are searched:
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `match_changed_lines_only` | Boolean | `false` | By default, matchers search the entire file if it was modified. Set to `true` to restrict the search **strictly** to the lines that were changed in the diff. |
+| `match_deleted_lines` | Boolean | `false` | By default, only added (`+`) lines in the diff are searched. Set to `true` to also search lines that were removed (`-`). Useful for catching when a developer deletes a security guardrail. |
+
+
 ### 1. String Mode
 
 Match exact strings in changed lines.

@@ -1416,6 +1416,14 @@ Match files by glob pattern, optionally with content matching:
 
 ### Content Matching Modes
 
+#### Common Properties
+
+All content rules (except `full_file`) support these optional boolean properties to control what parts of the git diff are searched:
+
+- `match_changed_lines_only` (default: `false`): If `true`, the system only searches exactly within the changed lines in the diff. If `false`, it searches the entire content of the file if the file was touched.
+- `match_deleted_lines` (default: `false`): If `true`, includes removed (`-`) lines in the diff search instead of only added (`+`) lines. Crucial for detecting when security guardrails or hardcoded constraints are deleted.
+
+
 #### 1. String Mode
 
 Match exact strings in changed lines:
