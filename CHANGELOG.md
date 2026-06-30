@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.1] - 2026-07-01
+
+### 💅 Improvements
+
+- PR comment footer now links to [Decispher](https://decispher.com) — surfaces the smarter, org-wide decision capture solution alongside the free Action. Applied across all comment variants (alert, all-clear, truncated, and ultra-compact).
+
+---
+
 ## [1.2.0] - 2026-03-15
 
 ### 🐛 Bug Fixes
