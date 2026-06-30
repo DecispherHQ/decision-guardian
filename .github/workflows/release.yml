@@ -52,12 +52,8 @@ jobs:
             echo "exists=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Publish to NPM
-        if: steps.check_tag.outputs.exists == 'false'
-        run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
+      # Tag + release the GitHub Action FIRST so a flaky/expired npm token can
+      # never block consumers pinned to @v1 / @vX.Y.Z. NPM publish is decoupled below.
       - name: Create Release Tag
         if: steps.check_tag.outputs.exists == 'false'
         run: |
@@ -70,3 +66,12 @@ jobs:
         run: |
           git tag -f v1
           git push -f origin v1
+
+      # Non-blocking: the CLI npm package is independent of the Action. If this
+      # fails (e.g. expired NPM_TOKEN), the Action release above still succeeds.
+      - name: Publish to NPM
+        if: steps.check_tag.outputs.exists == 'false'
+        continue-on-error: true
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
