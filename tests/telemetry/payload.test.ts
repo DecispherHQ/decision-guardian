@@ -1,4 +1,5 @@
-import { buildPayload } from '../../src/telemetry/payload';
+import { buildPayload, PAYLOAD_SCHEMA } from '../../src/telemetry/payload';
+import { validatePrivacy } from '../../src/telemetry/privacy';
 import { MetricsSnapshot } from '../../src/core/metrics';
 
 describe('buildPayload', () => {
@@ -35,5 +36,51 @@ describe('buildPayload', () => {
         const metricsKeys = Object.keys(result.metrics);
         expect(metricsKeys).not.toContain('api_calls');
         expect(metricsKeys).not.toContain('rate_limit_hits');
+    });
+
+    describe('repository identity', () => {
+        const originalRepo = process.env.GITHUB_REPOSITORY;
+        const originalEvent = process.env.GITHUB_EVENT_NAME;
+
+        afterEach(() => {
+            if (originalRepo === undefined) delete process.env.GITHUB_REPOSITORY;
+            else process.env.GITHUB_REPOSITORY = originalRepo;
+            if (originalEvent === undefined) delete process.env.GITHUB_EVENT_NAME;
+            else process.env.GITHUB_EVENT_NAME = originalEvent;
+        });
+
+        it('should carry a schema version', () => {
+            expect(buildPayload('action', snapshot, '1.0.0').schema).toBe(PAYLOAD_SCHEMA);
+        });
+
+        it('should include an opaque repo_hash, never the repository name', () => {
+            process.env.GITHUB_REPOSITORY = 'acme-corp/secret-project';
+            const result = buildPayload('action', snapshot, '1.0.0');
+
+            expect(result.repo_hash).toMatch(/^[a-f0-9]{16}$/);
+            expect(JSON.stringify(result)).not.toContain('acme-corp');
+            expect(JSON.stringify(result)).not.toContain('secret-project');
+        });
+
+        it('should produce the same hash for the same repo across runs', () => {
+            process.env.GITHUB_REPOSITORY = 'acme-corp/widget';
+            const a = buildPayload('action', snapshot, '1.0.0');
+            const b = buildPayload('action', snapshot, '1.0.0');
+            expect(a.repo_hash).toBe(b.repo_hash);
+        });
+
+        it('should record the triggering event name', () => {
+            process.env.GITHUB_REPOSITORY = 'acme-corp/widget';
+            process.env.GITHUB_EVENT_NAME = 'pull_request';
+            expect(buildPayload('action', snapshot, '1.0.0').event_name).toBe('pull_request');
+        });
+
+        it('should pass the privacy validator', () => {
+            process.env.GITHUB_REPOSITORY = 'acme-corp/secret-project';
+            const result = buildPayload('action', snapshot, '1.0.0');
+            expect(() =>
+                validatePrivacy(result as unknown as Record<string, unknown>)
+            ).not.toThrow();
+        });
     });
 });

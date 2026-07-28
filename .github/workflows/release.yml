@@ -69,9 +69,11 @@ jobs:
 
       # Non-blocking: the CLI npm package is independent of the Action. If this
       # fails (e.g. expired NPM_TOKEN), the Action release above still succeeds.
+      # --provenance uses the id-token permission above to attest on npm that
+      # this tarball was built by this workflow from this commit.
       - name: Publish to NPM
         if: steps.check_tag.outputs.exists == 'false'
         continue-on-error: true
-        run: npm publish
+        run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

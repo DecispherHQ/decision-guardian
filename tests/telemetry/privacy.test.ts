@@ -47,5 +47,45 @@ describe('validatePrivacy', () => {
             })
         ).toThrow(/Repo_Name/i);
     });
+
+    it('should accept a well-formed repo_hash', () => {
+        expect(() =>
+            validatePrivacy({
+                event: 'run_complete',
+                repo_hash: 'a1b2c3d4e5f60718',
+            })
+        ).not.toThrow();
+    });
+
+    it('should accept a null repo_hash (repository undeterminable)', () => {
+        expect(() =>
+            validatePrivacy({
+                event: 'run_complete',
+                repo_hash: null,
+            })
+        ).not.toThrow();
+    });
+
+    it('should throw if repo_hash carries a raw repository reference', () => {
+        expect(() =>
+            validatePrivacy({
+                event: 'run_complete',
+                repo_hash: 'github.com/acme/secret-project',
+            })
+        ).toThrow(/non-hashed value in hashed field: repo_hash/);
+    });
+
+    it('should throw if repo_hash is the wrong length or not hex', () => {
+        expect(() => validatePrivacy({ repo_hash: 'abc' })).toThrow(/repo_hash/);
+        expect(() => validatePrivacy({ repo_hash: 'A1B2C3D4E5F60718' })).toThrow(/repo_hash/);
+        expect(() => validatePrivacy({ repo_hash: 'zzzzzzzzzzzzzzzz' })).toThrow(/repo_hash/);
+    });
+
+    it('should block raw remote/repo URL fields', () => {
+        expect(() => validatePrivacy({ remote_url: 'git@github.com:a/b.git' })).toThrow(
+            /remote_url/
+        );
+        expect(() => validatePrivacy({ repo_url: 'https://github.com/a/b' })).toThrow(/repo_url/);
+    });
 });
 

@@ -1,6 +1,6 @@
 {
   "name": "decision-guardian",
-  "version": "1.2.1",
+  "version": "1.3.0",
   "description": "Surface architectural decision context on Pull Requests",
   "main": "dist/index.js",
   "bin": {
@@ -13,8 +13,12 @@
     "LICENSE"
   ],
   "scripts": {
+    "sync:version": "node scripts/sync-version.js",
+    "prebuild": "npm run sync:version",
     "build": "tsc",
+    "prebundle": "npm run sync:version",
     "bundle": "ncc build src/main.ts -o dist --license licenses.txt",
+    "prebuild:cli": "npm run sync:version",
     "build:cli": "ncc build src/cli/index.ts -o dist/cli --license licenses.txt",
     "test": "jest",
     "test:e2e": "npx ts-node scripts/e2e-test.ts",

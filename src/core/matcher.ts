@@ -43,7 +43,7 @@ export class FileMatcher {
     if (patternDecisions.length > 0) {
       const patternDecisionSet = new Set(patternDecisions);
 
-      const decisionMatches = new Map<Decision, { files: string[]; patterns: Set<string> }>();
+      const decisionMatches = new Map<Decision, { file: string; pattern: string }[]>();
 
       for (const fileDiff of fileDiffs) {
         const normalizedFile = fileDiff.filename.replace(/\\/g, '/').normalize('NFC');
@@ -54,32 +54,29 @@ export class FileMatcher {
 
           const matchedPattern = this.matchesDecision(normalizedFile, decision);
           if (matchedPattern) {
-            if (!decisionMatches.has(decision)) {
-              decisionMatches.set(decision, { files: [], patterns: new Set() });
+            let hits = decisionMatches.get(decision);
+            if (!hits) {
+              hits = [];
+              decisionMatches.set(decision, hits);
             }
-            const matchData = decisionMatches.get(decision)!;
-            matchData.files.push(normalizedFile);
-            matchData.patterns.add(matchedPattern);
+            hits.push({ file: normalizedFile, pattern: matchedPattern });
           }
         }
       }
 
-      for (const [decision, data] of decisionMatches) {
-        for (const file of data.files) {
-          const matchedPattern = this.matchesDecision(file, decision);
-          if (matchedPattern) {
-            matches.push({
-              file,
-              decision,
-              matchedPattern,
-              matchDetails: {
-                matched: true,
-                matchedFiles: [file],
-                matchedPatterns: [matchedPattern],
-                ruleDepth: 0,
-              },
-            });
-          }
+      for (const [decision, hits] of decisionMatches) {
+        for (const { file, pattern } of hits) {
+          matches.push({
+            file,
+            decision,
+            matchedPattern: pattern,
+            matchDetails: {
+              matched: true,
+              matchedFiles: [file],
+              matchedPatterns: [pattern],
+              ruleDepth: 0,
+            },
+          });
         }
       }
     }

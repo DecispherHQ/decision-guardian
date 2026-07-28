@@ -9158,31 +9158,28 @@ class FileMatcher {
                         continue;
                     const matchedPattern = this.matchesDecision(normalizedFile, decision);
                     if (matchedPattern) {
-                        if (!decisionMatches.has(decision)) {
-                            decisionMatches.set(decision, { files: [], patterns: new Set() });
+                        let hits = decisionMatches.get(decision);
+                        if (!hits) {
+                            hits = [];
+                            decisionMatches.set(decision, hits);
                         }
-                        const matchData = decisionMatches.get(decision);
-                        matchData.files.push(normalizedFile);
-                        matchData.patterns.add(matchedPattern);
+                        hits.push({ file: normalizedFile, pattern: matchedPattern });
                     }
                 }
             }
-            for (const [decision, data] of decisionMatches) {
-                for (const file of data.files) {
-                    const matchedPattern = this.matchesDecision(file, decision);
-                    if (matchedPattern) {
-                        matches.push({
-                            file,
-                            decision,
-                            matchedPattern,
-                            matchDetails: {
-                                matched: true,
-                                matchedFiles: [file],
-                                matchedPatterns: [matchedPattern],
-                                ruleDepth: 0,
-                            },
-                        });
-                    }
+            for (const [decision, hits] of decisionMatches) {
+                for (const { file, pattern } of hits) {
+                    matches.push({
+                        file,
+                        decision,
+                        matchedPattern: pattern,
+                        matchDetails: {
+                            matched: true,
+                            matchedFiles: [file],
+                            matchedPatterns: [pattern],
+                            ruleDepth: 0,
+                        },
+                    });
                 }
             }
         }
@@ -10330,19 +10327,130 @@ exports.PatternTrie = PatternTrie;
 
 /***/ }),
 
-/***/ 9721:
-/***/ ((__unused_webpack_module, exports) => {
+/***/ 6137:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.REPO_HASH_PATTERN = exports.REPO_HASH_LENGTH = void 0;
+exports.normalizeRepoRef = normalizeRepoRef;
+exports.resolveRepoRef = resolveRepoRef;
+exports.computeRepoHash = computeRepoHash;
+exports.resolveRepoVisibility = resolveRepoVisibility;
+/**
+ * Pseudonymous repository identity for telemetry.
+ *
+ */
+const crypto_1 = __nccwpck_require__(6982);
+const child_process_1 = __nccwpck_require__(5317);
+const fs_1 = __nccwpck_require__(9896);
+const REPO_HASH_SALT = 'decision-guardian.repo-identity.v1';
+exports.REPO_HASH_LENGTH = 16;
+exports.REPO_HASH_PATTERN = /^[a-f0-9]{16}$/;
+/**
+ * Normalize a repository reference so the same repo always yields the same
+ * hash regardless of how it was addressed.
+ *
+ * All of these collapse to `github.com/owner/repo`:
+ *   git@github.com:Owner/Repo.git
+ *   https://github.com/owner/repo
+ *   https://x-access-token:TOKEN@github.com/owner/repo.git
+ *   owner/repo            (GITHUB_REPOSITORY form, assumed github.com)
+ */
+function normalizeRepoRef(raw) {
+    let ref = raw.trim();
+    if (!ref)
+        return null;
+    if (/^[^/\s:]+\/[^/\s:]+$/.test(ref) && !ref.includes('@')) {
+        return `github.com/${ref.toLowerCase()}`;
+    }
+    const scp = ref.match(/^[^@\s]+@([^:\s]+):(.+)$/);
+    if (scp) {
+        ref = `${scp[1]}/${scp[2]}`;
+    }
+    else {
+        ref = ref.replace(/^[a-z][a-z0-9+.-]*:\/\//i, '');
+        ref = ref.replace(/^[^@/]*@/, '');
+    }
+    ref = ref.replace(/\.git$/i, '').replace(/\/+$/, '');
+    if (!ref.includes('/'))
+        return null;
+    return ref.toLowerCase();
+}
+/**
+ * Resolve the current repository reference.
+ * Prefers the CI-provided value; falls back to the git origin remote for
+ * local CLI runs. Returns null when neither is available (never guesses).
+ */
+function resolveRepoRef() {
+    const fromEnv = process.env.GITHUB_REPOSITORY;
+    if (fromEnv)
+        return normalizeRepoRef(fromEnv);
+    try {
+        const out = (0, child_process_1.execFileSync)('git', ['config', '--get', 'remote.origin.url'], {
+            encoding: 'utf-8',
+            timeout: 2000,
+            stdio: ['ignore', 'pipe', 'ignore'],
+            windowsHide: true,
+        });
+        return normalizeRepoRef(out);
+    }
+    catch {
+        return null;
+    }
+}
+/**
+ * Stable pseudonymous identifier for the current repository,
+ * or null when the repository cannot be determined.
+ */
+function computeRepoHash(ref = resolveRepoRef()) {
+    if (!ref)
+        return null;
+    return (0, crypto_1.createHmac)('sha256', REPO_HASH_SALT)
+        .update(ref, 'utf8')
+        .digest('hex')
+        .substring(0, exports.REPO_HASH_LENGTH);
+}
+function resolveRepoVisibility() {
+    const eventPath = process.env.GITHUB_EVENT_PATH;
+    if (!eventPath)
+        return null;
+    try {
+        const payload = JSON.parse((0, fs_1.readFileSync)(eventPath, 'utf-8'));
+        const isPrivate = payload?.repository?.private;
+        if (typeof isPrivate !== 'boolean')
+            return null;
+        return isPrivate ? 'private' : 'public';
+    }
+    catch {
+        return null;
+    }
+}
+
+
+/***/ }),
+
+/***/ 9721:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.PAYLOAD_SCHEMA = void 0;
 exports.buildPayload = buildPayload;
+const identity_1 = __nccwpck_require__(6137);
+exports.PAYLOAD_SCHEMA = 2;
 function buildPayload(source, snapshot, version) {
     return {
         event: 'run_complete',
+        schema: exports.PAYLOAD_SCHEMA,
         version,
         source,
         timestamp: new Date().toISOString(),
+        repo_hash: (0, identity_1.computeRepoHash)(),
+        repo_visibility: (0, identity_1.resolveRepoVisibility)(),
+        event_name: process.env.GITHUB_EVENT_NAME || null,
         metrics: {
             files_processed: snapshot.files_processed,
             decisions_evaluated: snapshot.decisions_evaluated,
@@ -10364,15 +10472,18 @@ function buildPayload(source, snapshot, version) {
 /***/ }),
 
 /***/ 2755:
-/***/ ((__unused_webpack_module, exports) => {
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.validatePrivacy = validatePrivacy;
+const identity_1 = __nccwpck_require__(6137);
 const BLOCKED_FIELDS = new Set([
     'repo_name',
     'org_name',
+    'repo_url',
+    'remote_url',
     'file_names',
     'file_paths',
     'pr_title',
@@ -10385,11 +10496,33 @@ const BLOCKED_FIELDS = new Set([
     'author',
     'email',
 ]);
+/** Fields that must carry a hash, never a raw value, if present at all. */
+const HASHED_FIELDS = new Set(['repo_hash']);
 function validatePrivacy(payload) {
     const violations = findBlockedKeys(payload);
     if (violations.length > 0) {
         throw new Error(`Telemetry privacy violation: blocked fields found: ${violations.join(', ')}`);
     }
+    const malformed = findMalformedHashes(payload);
+    if (malformed.length > 0) {
+        throw new Error(`Telemetry privacy violation: non-hashed value in hashed field: ${malformed.join(', ')}`);
+    }
+}
+function findMalformedHashes(obj, prefix = '') {
+    const violations = [];
+    for (const key of Object.keys(obj)) {
+        const fullKey = prefix ? `${prefix}.${key}` : key;
+        const value = obj[key];
+        if (HASHED_FIELDS.has(key.toLowerCase())) {
+            if (value !== null && (typeof value !== 'string' || !identity_1.REPO_HASH_PATTERN.test(value))) {
+                violations.push(fullKey);
+            }
+        }
+        if (value && typeof value === 'object' && !Array.isArray(value)) {
+            violations.push(...findMalformedHashes(value, fullKey));
+        }
+    }
+    return violations;
 }
 function findBlockedKeys(obj, prefix = '') {
     const violations = [];
@@ -10464,9 +10597,9 @@ async function sendTelemetry(source, snapshot, version) {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.VERSION = void 0;
 /**
- * Version information for Decision Guardian
+ * Generated by scripts/sync-version.js. Edit package.json instead.
  */
-exports.VERSION = '1.2.1';
+exports.VERSION = '1.3.0';
 
 
 /***/ }),

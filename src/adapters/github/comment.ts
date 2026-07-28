@@ -2,9 +2,17 @@
  * CommentManager — GitHub PR commenting logic.
  */
 import * as github from '@actions/github';
-import { DecisionMatch } from '../../core/types';
+import { Decision, DecisionMatch } from '../../core/types';
 import type { ILogger } from '../../core/interfaces/logger';
 import * as crypto from 'crypto';
+
+/** All matches for a single decision, collapsed into one renderable unit. */
+interface DecisionGroup {
+  decision: Decision;
+  files: string[];
+  patterns: string[];
+  isRuleBased: boolean;
+}
 
 export class CommentManager {
   private readonly octokit: ReturnType<typeof github.getOctokit>;
@@ -12,6 +20,16 @@ export class CommentManager {
   private readonly MARKER = '<!-- decision-guardian-v1 -->';
   private readonly ALL_CLEAR_HASH = 'all-clear';
   private readonly MAX_COMMENT_LENGTH = 60000; // GitHub API limit is 65536
+
+  /** Render order and headings for severity sections, most severe first. */
+  private static readonly SEVERITY_SECTIONS: ReadonlyArray<{
+    heading: string;
+    severity: 'critical' | 'warning' | 'info';
+  }> = [
+    { heading: '### 🔴 Critical Decisions', severity: 'critical' },
+    { heading: '### 🟡 Important Decisions', severity: 'warning' },
+    { heading: '### ℹ️ Informational', severity: 'info' },
+  ];
 
   constructor(token: string, logger: ILogger) {
     this.octokit = github.getOctokit(token);
@@ -311,33 +329,23 @@ export class CommentManager {
    * Build the full comment without truncation
    */
   private buildFullComment(matches: DecisionMatch[], hash: string): string {
-    const grouped = this.groupBySeverity(matches);
-    const uniqueFiles = new Set(matches.map((m) => m.file)).size;
-    const uniqueDecisions = new Set(matches.map((m) => m.decision.id)).size;
+    const groups = this.groupByDecision(matches);
+    const grouped = this.groupBySeverity(groups);
+    const uniqueFiles = new Set(groups.flatMap((g) => g.files)).size;
+    const uniqueDecisions = groups.length;
 
     let comment = `${this.MARKER}\n`;
     comment += `<!-- hash:${hash} -->\n\n`;
     comment += `## ⚠️ Decision Context Alert\n\n`;
     comment += `This PR modifies **${uniqueFiles} file(s)** that trigger **${uniqueDecisions} architectural decision(s)**.\n\n`;
 
-    if (grouped.critical.length > 0) {
-      comment += `### 🔴 Critical Decisions (${grouped.critical.length})\n\n`;
-      for (const match of grouped.critical) {
-        comment += this.formatMatch(match);
-      }
-    }
+    for (const { heading, severity } of CommentManager.SEVERITY_SECTIONS) {
+      const sectionGroups = grouped[severity];
+      if (sectionGroups.length === 0) continue;
 
-    if (grouped.warning.length > 0) {
-      comment += `### 🟡 Important Decisions (${grouped.warning.length})\n\n`;
-      for (const match of grouped.warning) {
-        comment += this.formatMatch(match);
-      }
-    }
-
-    if (grouped.info.length > 0) {
-      comment += `### ℹ️ Informational (${grouped.info.length})\n\n`;
-      for (const match of grouped.info) {
-        comment += this.formatMatch(match);
+      comment += `${heading} (${sectionGroups.length})\n\n`;
+      for (const group of sectionGroups) {
+        comment += this.formatDecisionGroup(group);
       }
     }
 
@@ -408,9 +416,10 @@ export class CommentManager {
     maxDetailedMatches: number,
     maxFilesPerDecision: number,
   ): string {
-    const grouped = this.groupBySeverity(matches);
-    const uniqueFiles = new Set(matches.map((m) => m.file)).size;
-    const uniqueDecisions = new Set(matches.map((m) => m.decision.id)).size;
+    const groups = this.groupByDecision(matches);
+    const grouped = this.groupBySeverity(groups);
+    const uniqueFiles = new Set(groups.flatMap((g) => g.files)).size;
+    const uniqueDecisions = groups.length;
 
     let comment = `${this.MARKER}\n`;
     comment += `<!-- hash:${hash} -->\n\n`;
@@ -418,54 +427,33 @@ export class CommentManager {
     comment += `> **Large PR**: **${uniqueFiles} file(s)** trigger **${uniqueDecisions} decision(s)** - showing summary.\n\n`;
 
     let detailedCount = 0;
-    const remainingMatches: DecisionMatch[] = [];
+    const remainingGroups: DecisionGroup[] = [];
 
-    if (grouped.critical.length > 0) {
-      comment += `### 🔴 Critical Decisions (${grouped.critical.length})\n\n`;
-      for (const match of grouped.critical) {
+    for (const { heading, severity } of CommentManager.SEVERITY_SECTIONS) {
+      const sectionGroups = grouped[severity];
+      if (sectionGroups.length === 0) continue;
+
+      comment += `${heading} (${sectionGroups.length})\n\n`;
+      for (const group of sectionGroups) {
         if (detailedCount < maxDetailedMatches) {
-          comment += this.formatMatch(match);
+          comment += this.formatDecisionGroup(group, maxFilesPerDecision);
           detailedCount++;
         } else {
-          remainingMatches.push(match);
+          remainingGroups.push(group);
         }
       }
     }
 
-    if (grouped.warning.length > 0) {
-      comment += `### 🟡 Important Decisions (${grouped.warning.length})\n\n`;
-      for (const match of grouped.warning) {
-        if (detailedCount < maxDetailedMatches) {
-          comment += this.formatMatch(match);
-          detailedCount++;
-        } else {
-          remainingMatches.push(match);
-        }
-      }
-    }
-
-    if (grouped.info.length > 0) {
-      comment += `### ℹ️ Informational (${grouped.info.length})\n\n`;
-      for (const match of grouped.info) {
-        if (detailedCount < maxDetailedMatches) {
-          comment += this.formatMatch(match);
-          detailedCount++;
-        } else {
-          remainingMatches.push(match);
-        }
-      }
-    }
-
-    if (remainingMatches.length > 0) {
+    if (remainingGroups.length > 0) {
       comment += this.buildSummarySectionForRemainingWithLimit(
-        remainingMatches,
+        remainingGroups,
         maxFilesPerDecision,
       );
     }
 
     comment += `\n---\n`;
     comment += `*🤖 Generated by [Decision Guardian](https://github.com/DecispherHQ/decision-guardian). `;
-    comment += `Showing ${detailedCount} of ${matches.length} matches.*\n`;
+    comment += `Showing ${detailedCount} of ${groups.length} decisions.*\n`;
     comment += `\n💡 *Want smarter, automatic decision capture across your whole org? [Try Decispher →](https://decispher.com)*\n`;
 
     return comment;
@@ -475,22 +463,18 @@ export class CommentManager {
    * Build ultra-compact comment showing only counts (last resort before hard truncation)
    */
   private buildUltraCompactComment(matches: DecisionMatch[], hash: string): string {
-    const grouped = this.groupBySeverity(matches);
+    const groups = this.groupByDecision(matches);
+    const grouped = this.groupBySeverity(groups);
 
     const byDecision = new Map<string, { count: number; severity: string }>();
-    for (const match of matches) {
-      const existing = byDecision.get(match.decision.id);
-      if (existing) {
-        existing.count++;
-      } else {
-        byDecision.set(match.decision.id, {
-          count: 1,
-          severity: match.decision.severity || 'info',
-        });
-      }
+    for (const group of groups) {
+      byDecision.set(group.decision.id, {
+        count: group.files.length,
+        severity: group.decision.severity || 'info',
+      });
     }
 
-    const uniqueFiles = new Set(matches.map((m) => m.file)).size;
+    const uniqueFiles = new Set(groups.flatMap((g) => g.files)).size;
 
     let comment = `${this.MARKER}\n`;
     comment += `<!-- hash:${hash} -->\n\n`;
@@ -543,34 +527,19 @@ export class CommentManager {
   }
 
   /**
-   * Build a compact summary section for matches that couldn't be shown in detail
-   */
-  private buildSummarySectionForRemaining(matches: DecisionMatch[]): string {
-    return this.buildSummarySectionForRemainingWithLimit(matches, 10);
-  }
-
-  /**
-   * Build a compact summary section with configurable file limit per decision
+   * Build a compact summary section for decisions that couldn't be shown in detail
    */
   private buildSummarySectionForRemainingWithLimit(
-    matches: DecisionMatch[],
+    groups: DecisionGroup[],
     maxFilesPerDecision: number,
   ): string {
-    const byDecision = new Map<string, string[]>();
+    let section = `\n### 📋 Additional Decisions (${groups.length} more)\n\n`;
+    section += `<details>\n<summary>Click to expand summary of remaining decisions</summary>\n\n`;
 
-    for (const match of matches) {
-      const files = byDecision.get(match.decision.id) || [];
-      files.push(match.file);
-      byDecision.set(match.decision.id, files);
-    }
-
-    let section = `\n### 📋 Additional Matches (${matches.length} more)\n\n`;
-    section += `<details>\n<summary>Click to expand summary of remaining files</summary>\n\n`;
-
-    for (const [decisionId, files] of byDecision) {
-      section += `**${decisionId}** (${files.length} files):\n`;
-      const displayFiles = files.slice(0, maxFilesPerDecision);
-      const remainingCount = files.length - displayFiles.length;
+    for (const group of groups) {
+      section += `**${group.decision.id}** (${group.files.length} files):\n`;
+      const displayFiles = group.files.slice(0, maxFilesPerDecision);
+      const remainingCount = group.files.length - displayFiles.length;
 
       for (const file of displayFiles) {
         section += `- \`${file}\`\n`;
@@ -588,9 +557,10 @@ export class CommentManager {
   }
 
   /**
-   * Format a single match with link to source, blockquote context, and collapsible for long content
+   * Format one decision and every file it matched: link to source, blockquote
+   * context, and collapsibles for long content or long file lists.
    */
-  private formatMatch(match: DecisionMatch): string {
+  private formatDecisionGroup(group: DecisionGroup, maxFiles = 25): string {
     const escapeMarkdown = (str: string): string => {
       return str
         .replace(/[\\`*_{}[\]()#+\-.!]/g, '\\$&')
@@ -598,17 +568,35 @@ export class CommentManager {
         .replace(/>/g, '&gt;');
     };
 
-    const { file, decision, matchedPattern, matchDetails } = match;
+    const { decision, files, patterns } = group;
 
-    let patternDisplay = matchedPattern;
-    if (matchDetails && matchDetails.matchedPatterns && matchDetails.matchedPatterns.length > 0) {
-      patternDisplay = matchDetails.matchedPatterns.slice(0, 3).join(', ');
-      if (matchDetails.matchedPatterns.length > 3) {
-        patternDisplay += ` (+${matchDetails.matchedPatterns.length - 3} more)`;
-      }
+    let patternDisplay = patterns.slice(0, 3).join(', ');
+    if (patterns.length > 3) {
+      patternDisplay += ` (+${patterns.length - 3} more)`;
     }
 
-    const matchType = matchDetails ? 'Rule-based' : 'File pattern';
+    const matchType = group.isRuleBased ? 'Rule-based' : 'File pattern';
+
+    let filesCell: string;
+    let fileListSection = '';
+
+    if (files.length === 1) {
+      filesCell = `\`${escapeMarkdown(files[0])}\``;
+    } else {
+      filesCell = `**${files.length}** files`;
+
+      const shown = files.slice(0, maxFiles);
+      const hidden = files.length - shown.length;
+
+      fileListSection = `<details>\n<summary>📂 ${files.length} matched files</summary>\n\n`;
+      for (const file of shown) {
+        fileListSection += `- \`${escapeMarkdown(file)}\`\n`;
+      }
+      if (hidden > 0) {
+        fileListSection += `- *...and ${hidden} more*\n`;
+      }
+      fileListSection += `\n</details>\n\n`;
+    }
 
     // Build source file link (full GitHub blob URL)
     const workspaceRoot = process.env.GITHUB_WORKSPACE || process.cwd();
@@ -663,30 +651,75 @@ export class CommentManager {
 
 | | |
 |---|---|
-| **File** | \`${escapeMarkdown(file)}\` |
+| **${files.length === 1 ? 'File' : 'Files'}** | ${filesCell} |
 | **Pattern** | \`${escapeMarkdown(patternDisplay)}\` |
 | **Type** | ${matchType} |
 | **Date** | ${escapeMarkdown(decision.date)} |
 | **Source** | ${sourceLink} |
 
-${contextSection}
+${fileListSection}${contextSection}
 ---
 
 `;
   }
 
   /**
-   * Group matches by severity
+   * Collapse per-file matches into one group per decision, preserving first-seen
+   * order and de-duplicating files and patterns.
+   *
+   * Keyed by decision identity rather than id: directory mode merges files
+   * without cross-file de-duplication, so two files may define the same id.
    */
-  private groupBySeverity(matches: DecisionMatch[]): {
-    critical: DecisionMatch[];
-    warning: DecisionMatch[];
-    info: DecisionMatch[];
+  private groupByDecision(matches: DecisionMatch[]): DecisionGroup[] {
+    const accumulator = new Map<Decision, { files: Set<string>; patterns: Set<string> }>();
+
+    for (const match of matches) {
+      let entry = accumulator.get(match.decision);
+      if (!entry) {
+        entry = { files: new Set(), patterns: new Set() };
+        accumulator.set(match.decision, entry);
+      }
+
+      for (const file of CommentManager.filesOf(match)) entry.files.add(file);
+      for (const pattern of CommentManager.patternsOf(match)) entry.patterns.add(pattern);
+    }
+
+    return [...accumulator].map(([decision, { files, patterns }]) => ({
+      decision,
+      files: [...files],
+      patterns: [...patterns],
+      isRuleBased: Boolean(decision.rules),
+    }));
+  }
+
+  /**
+   * Every match carrying matchDetails has an explicit file list. The one path
+   * without it yields exactly one file, taken verbatim: splitting on comma would
+   * corrupt filenames that legitimately contain one.
+   */
+  private static filesOf(match: DecisionMatch): string[] {
+    const explicit = match.matchDetails?.matchedFiles;
+    if (explicit && explicit.length > 0) return explicit;
+
+    return match.file ? [match.file] : [];
+  }
+
+  private static patternsOf(match: DecisionMatch): string[] {
+    const fromRule = match.matchDetails?.matchedPatterns;
+    if (fromRule && fromRule.length > 0) return fromRule;
+
+    return match.matchedPattern ? [match.matchedPattern] : [];
+  }
+
+  private groupBySeverity(groups: DecisionGroup[]): {
+    critical: DecisionGroup[];
+    warning: DecisionGroup[];
+    info: DecisionGroup[];
   } {
     return {
-      critical: matches.filter((m) => m.decision.severity === 'critical'),
-      warning: matches.filter((m) => m.decision.severity === 'warning'),
-      info: matches.filter((m) => m.decision.severity === 'info'),
+      critical: groups.filter((g) => g.decision.severity === 'critical'),
+      warning: groups.filter((g) => g.decision.severity === 'warning'),
+      info: groups.filter((g) => g.decision.severity === 'info'),
     };
   }
 }

@@ -37,7 +37,7 @@ Decision Guardian solves this. You write decisions once in **simple Markdown fil
 - 🔒 **Security-First** — ReDoS prevention, path traversal protection, Zod validation, VM sandboxed regex
 - 🔄 **Smart Behavior** — Idempotent comments, self-healing duplicate cleanup, progressive truncation
 - 💻 **CLI + GitHub Action** — Works locally, in any CI system (GitLab, Jenkins, CircleCI), or as a native GitHub Action
-- 🔏 **Privacy-First Telemetry** — Opt-out with `DG_TELEMETRY=0`. No source code ever leaves your repo. See [PRIVACY.md](PRIVACY.md)
+- 🔏 **Privacy-First Telemetry** — **On by default**; opt out with `DG_TELEMETRY=0`. No source code, file paths, or repository names ever leave your repo — only counts plus a pseudonymous repo hash. See [PRIVACY.md](PRIVACY.md)
 
 ---
 
@@ -90,9 +90,17 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           decision_file: '.decispher/decisions.md'
           fail_on_critical: true
+        # Usage telemetry is ON by default. To disable:
+        #   env:
+        #     DG_TELEMETRY: '0'
 ```
 
 **3. Done!** — Open a PR modifying `src/db/pool.ts` → Decision Guardian comments with context from `DECISION-DB-001`.
+
+> **Note:** Decision Guardian runs entirely inside your CI. It is a self-contained
+> GitHub Action, so **there is no service to host, no account to create, and no
+> outbound access to your code.** It reports run counts and a pseudonymous repo
+> hash, never your code or repository name. [Full details and opt-out](PRIVACY.md).
 
 > 📖 For production-ready configuration (concurrency, outputs, etc.), see the [full documentation](https://decision-guardian.decispher.com/docs).
 

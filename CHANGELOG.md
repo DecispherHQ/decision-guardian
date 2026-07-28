@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.3.0] - 2026-07-28
+
+### 💅 Improvements
+
+- **PR comments are now grouped by decision instead of by file.** Previously a decision covering
+  many changed files rendered its entire context block once per file — a PR touching 60 files
+  under one decision produced 60 identical rationales. Each decision now renders once, with its
+  matched files in a collapsible list. On a 30-decision / 1,800-match PR this cuts the comment
+  from ~1.6M characters to ~48K (**97% smaller**) and keeps every rationale intact where the
+  comment previously collapsed to a counts-only table.
+- Eliminated a redundant second glob evaluation per matched file in `FileMatcher`.
+
+### 📊 Telemetry
+
+- Added `repo_hash`, a **pseudonymous** per-repository identifier, so run counts can be resolved
+  into distinct repositories, active-repo counts, and retention. **Your repository name is still
+  never transmitted.** The hash is stable, which makes runs from one repository linkable to each
+  other — the trade-off, the salt, and the 400-day retention for these records are all spelled out
+  in [PRIVACY.md](PRIVACY.md). Telemetry remains opt-out via `DG_TELEMETRY=0`.
+- Added `repo_visibility`, `event_name`, and a payload `schema` version.
+- The privacy validator now enforces the *shape* of hashed fields, so a regression cannot leak a
+  raw repository reference; the collector rejects malformed hashes as well.
+- `/stats` now reports `unique_repos_all_time`, `active_repos_7d`, `active_repos_30d`, and
+  per-day `new_repos`.
+
+### 🐛 Bug Fixes
+
+- Telemetry daily counters were undercounting: the collector's read-modify-write on a single
+  daily key lost increments across concurrent runs. Unique-repo tracking uses conflict-free
+  writes, and `/stats` now flags aggregate counters as a floor via `counters_are_floor`.
+
+### 📖 Documentation
+
+- README now states plainly that Decision Guardian runs entirely inside your CI — **no service to
+  host, no account, no outbound access to your code** — and surfaces the telemetry opt-out in the
+  quick start rather than only in PRIVACY.md.
+
+---
+
 ## [1.2.1] - 2026-07-01
 
 ### 💅 Improvements

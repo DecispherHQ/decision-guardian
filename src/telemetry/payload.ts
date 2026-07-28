@@ -1,10 +1,17 @@
 import { MetricsSnapshot } from '../core/metrics';
+import { computeRepoHash, resolveRepoVisibility } from './identity';
+
+export const PAYLOAD_SCHEMA = 2;
 
 export interface TelemetryPayload {
   event: 'run_complete';
+  schema: number;
   version: string;
   source: 'action' | 'cli';
   timestamp: string;
+  repo_hash: string | null;
+  repo_visibility: 'public' | 'private' | null;
+  event_name: string | null;
   metrics: {
     files_processed: number;
     decisions_evaluated: number;
@@ -28,9 +35,13 @@ export function buildPayload(
 ): TelemetryPayload {
   return {
     event: 'run_complete',
+    schema: PAYLOAD_SCHEMA,
     version,
     source,
     timestamp: new Date().toISOString(),
+    repo_hash: computeRepoHash(),
+    repo_visibility: resolveRepoVisibility(),
+    event_name: process.env.GITHUB_EVENT_NAME || null,
     metrics: {
       files_processed: snapshot.files_processed,
       decisions_evaluated: snapshot.decisions_evaluated,
