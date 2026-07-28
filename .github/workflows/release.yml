@@ -67,13 +67,17 @@ jobs:
           git tag -f v1
           git push -f origin v1
 
-      # Non-blocking: the CLI npm package is independent of the Action. If this
-      # fails (e.g. expired NPM_TOKEN), the Action release above still succeeds.
-      # --provenance uses the id-token permission above to attest on npm that
-      # this tarball was built by this workflow from this commit.
+      - name: Check if version is on NPM
+        id: check_npm
+        run: |
+          if npm view "decision-guardian@${{ steps.version.outputs.VERSION }}" version >/dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Publish to NPM
-        if: steps.check_tag.outputs.exists == 'false'
-        continue-on-error: true
+        if: steps.check_npm.outputs.exists == 'false'
         run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
